@@ -61,14 +61,15 @@ export function baueGraph(gross: boolean): Brett {
 
   koord.forEach(([q, r], id) => {
     hexIndex.set(`${q},${r}`, id);
-    hexes.push({ id, q, r, x: W3 * (q + r / 2), y: 1.5 * r, gelaende: 'wueste', zahl: null, ecken: [], nachbarn: [] });
+    hexes.push({ id, q, r, x: Math.round(W3 * (q + r / 2) * 1000) / 1000, y: 1.5 * r, gelaende: 'wueste', zahl: null, ecken: [], nachbarn: [] });
   });
 
   for (const h of hexes) {
     for (let i = 0; i < 6; i++) {
       const winkel = (Math.PI / 180) * (60 * i - 30);
-      const x = h.x + Math.cos(winkel);
-      const y = h.y + Math.sin(winkel);
+      // Auf 3 Stellen runden: reicht fürs Zeichnen und hält die Netzwerknachrichten klein.
+      const x = Math.round((h.x + Math.cos(winkel)) * 1000) / 1000;
+      const y = Math.round((h.y + Math.sin(winkel)) * 1000) / 1000;
       const key = `${Math.round(x * 100)},${Math.round(y * 100)}`;
       let id = eckeIndex.get(key);
       if (id === undefined) {
