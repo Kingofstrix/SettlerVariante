@@ -5,7 +5,8 @@ import type { Sitzung } from '../netz/sitzung';
 import { Brett } from './Brett';
 import { HilfeDialog } from './Dialoge';
 import { EndeDialog, Menue } from './Spiel';
-import { LogListe, SpielerTafel, TimerBalken, WurfAnzeige, statusText } from './Teile';
+import { useKartenFluege } from './animation';
+import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WurfAnzeige, statusText } from './Teile';
 import { useSitzung } from './hooks';
 
 export function BeamerAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVerlassen: () => void }): JSX.Element {
@@ -14,10 +15,12 @@ export function BeamerAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVe
   const [dialog, setDialog] = useState<null | 'hilfe' | 'menue'>(null);
   const status = statusText(sicht);
   const sonderbau = sicht.phase === 'sonderbau';
+  useKartenFluege(sicht);
   return (
     <div class="beamer">
       <main class="brettbereich">
         <Brett sicht={sicht} />
+        <AngebotsListe sicht={sicht} />
       </main>
       <aside class="seite">
         <div class="kopf">
@@ -42,6 +45,7 @@ export function BeamerAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVe
         </div>
         <TimerBalken timer={z.timer} pausiert={z.pausiert} />
         <SpielerTafel sicht={sicht} verbunden={z.verbunden} />
+        <BankAnzeige sicht={sicht} />
         <LogListe sicht={sicht} max={12} />
       </aside>
       {dialog === 'hilfe' && <HilfeDialog onZu={() => setDialog(null)} />}

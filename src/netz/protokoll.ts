@@ -1,16 +1,17 @@
 // Versioniertes JSON-Protokoll zwischen Host und Clients. Jede eingehende Nachricht wird geprüft;
 // Unbekanntes oder Ungültiges wird verworfen (null), nie geworfen.
 import type { Brett, Sicht } from '../engine';
-import type { Absicht, Einstellungen, SitzInfo, TimerArt } from './sitzung';
+import { CHAT_MAX_LAENGE, type Absicht, type ChatEintrag, type Einstellungen, type SitzInfo, type TimerArt } from './sitzung';
 
-export const PROTOKOLL_VERSION = 1;
+export const PROTOKOLL_VERSION = 2; // 2: Chat, Kartenbewegungen
 
 // ---- Client -> Host ----
 export type ClientNachricht =
   | { v: number; t: 'hallo'; token: string; name: string; farbe: string; rolle: 'spieler' | 'beamer' }
   | { v: number; t: 'profil'; name: string; farbe: string }
   | { v: number; t: 'absicht'; nr: number; aktion: Absicht }
-  | { v: number; t: 'pong'; id: number };
+  | { v: number; t: 'pong'; id: number }
+  | { v: number; t: 'chat'; text: string };
 
 // ---- Host -> Client ----
 export type SichtOhneBrett = Omit<Sicht, 'brett'> & { brett?: Brett };
@@ -29,6 +30,7 @@ export type HostNachricht =
     }
   | { v: number; t: 'abgelehnt'; nr: number; grund: string }
   | { v: number; t: 'ping'; id: number }
+  | { v: number; t: 'chat'; eintraege: ChatEintrag[] }
   | { v: number; t: 'ende'; grund: EndeGrund };
 
 const ABSICHT_TYPEN = new Set([
@@ -67,6 +69,9 @@ export function pruefeClientNachricht(d: unknown): ClientNachricht | null {
       case 'pong':
         if (!zahl(d.id)) return null;
         return { v: d.v, t: 'pong', id: d.id };
+      case 'chat':
+        if (!text(d.text, CHAT_MAX_LAENGE * 2)) return null;
+        return { v: d.v, t: 'chat', text: d.text };
       default:
         return null;
     }
@@ -92,6 +97,15 @@ export function pruefeHostNachricht(d: unknown): HostNachricht | null {
       case 'ping':
         if (!zahl(d.id)) return null;
         return d as unknown as HostNachricht;
+      case 'chat':
+        if (!Array.isArray(d.eintraege)) return null;
+        return {
+          v: d.v,
+          t: 'chat',
+          eintraege: d.eintraege.filter(
+            (e): e is ChatEintrag => istObjekt(e) && zahl(e.nr) && typeof e.name === 'string' && typeof e.text === 'string' && typeof e.farbe === 'string',
+          ),
+        };
       case 'ende':
         if (typeof d.grund !== 'string') return null;
         return d as unknown as HostNachricht;

@@ -42,6 +42,7 @@ export class Client extends Beobachtbar implements Sitzung {
       verbunden: [],
       timer: null,
       pausiert: false,
+      chat: [],
       hinweis: null,
     };
     // Heartbeat-Wache: kommt länger nichts vom Host, gilt die Verbindung als tot.
@@ -128,6 +129,8 @@ export class Client extends Beobachtbar implements Sitzung {
             : null,
         });
       }
+      case 'chat':
+        return this.setze({ chat: n.eintraege });
       case 'abgelehnt':
         return this.setze({ hinweis: { nr: ++this.hinweisNr, text: n.grund } });
       case 'ende':
@@ -142,6 +145,10 @@ export class Client extends Beobachtbar implements Sitzung {
   aktion(a: Absicht): void {
     if (!this.conn) return this.setze({ hinweis: { nr: ++this.hinweisNr, text: 'Keine Verbindung zum Host.' } });
     this.sende({ v: PROTOKOLL_VERSION, t: 'absicht', nr: ++this.absichtNr, aktion: a });
+  }
+
+  chat(text: string): void {
+    this.sende({ v: PROTOKOLL_VERSION, t: 'chat', text });
   }
 
   profil(name: string, farbe: string): void {

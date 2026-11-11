@@ -106,6 +106,8 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
     gewinner: null,
     log: [],
     logNr: 0,
+    bewegungen: [],
+    bewegungNr: 0,
   };
   log(s, `Spiel gestartet (Seed ${s.seed}). Reihenfolge: ${s.spieler.map((p) => p.name).join(', ')}.`);
   log(s, `Gründungsphase: ${s.spieler[0].name} setzt die erste Siedlung.`);
@@ -139,6 +141,7 @@ function klon(s: GameState): GameState {
     angebote: s.angebote.map((a) => ({ ...a, an: a.an.slice(), abgelehnt: a.abgelehnt.slice() })),
     sonderbau: s.sonderbau ? { ...s.sonderbau } : null,
     log: s.log.slice(),
+    bewegungen: s.bewegungen.slice(),
   };
 }
 
@@ -170,11 +173,22 @@ export function gesamtPunkte(s: GameState, spieler: number): number {
   return oeffentlichePunkte(s, spieler) + s.spieler[spieler].entw.filter((k) => k.typ === 'siegpunkt').length;
 }
 
+const BEWEGUNGEN_MAX = 40;
+
+/** Hält eine Kartenbewegung fest (nur für die Anzeige; ändert keine Karten). */
+function bewege(s: GameState, von: number | null, nach: number | null, r: Rohstoff | 'entw', n: number): void {
+  if (n <= 0) return;
+  s.bewegungNr++;
+  s.bewegungen.push({ nr: s.bewegungNr, von, nach, r, n });
+  if (s.bewegungen.length > BEWEGUNGEN_MAX) s.bewegungen.splice(0, s.bewegungen.length - BEWEGUNGEN_MAX);
+}
+
 function zahle(s: GameState, spieler: number, kosten: Partial<Rohstoffe>): void {
   for (const r of ROHSTOFFE) {
     const n = kosten[r] ?? 0;
     s.spieler[spieler].hand[r] -= n;
     s.bank[r] += n;
+    bewege(s, spieler, null, r, n);
   }
 }
 
@@ -248,6 +262,7 @@ function verteile(s: GameState, zahl: number): string {
     for (const r of ROHSTOFFE) {
       s.spieler[i].hand[r] += e[r];
       s.bank[r] -= e[r];
+      bewege(s, null, i, r, e[r]);
     }
     teile.push(`${s.spieler[i].name} erhält ${formatRohstoffe(e)}`);
   });
@@ -263,6 +278,7 @@ function stehle(s: GameState, dieb: number, opfer: number): void {
   const r = waehle(s, karten);
   hand[r]--;
   s.spieler[dieb].hand[r]++;
+  bewege(s, opfer, dieb, r, 1);
   log(s, `${s.spieler[dieb].name} stiehlt eine Karte von ${s.spieler[opfer].name}.`, {
     fuer: [dieb, opfer],
     text: `${s.spieler[dieb].name} stiehlt 1× ${ROHSTOFF_NAME[r]} von ${s.spieler[opfer].name}.`,
@@ -457,6 +473,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
               p.hand[r]++;
             }
           }
+          for (const r of ROHSTOFFE) bewege(s, null, a.spieler, r, start[r]);
           text += ` und erhält ${formatRohstoffe(start)}`;
         }
         log(s, text + '.');
@@ -495,6 +512,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       zahle(s, a.spieler, KOSTEN.entwicklung);
       const typ = s.stapel.pop()!;
       p.entw.push({ typ, gekauftInZug: s.zugNr });
+      bewege(s, null, a.spieler, 'entw', 1);
       log(s, `${p.name} kauft eine Entwicklungskarte.`, {
         fuer: [a.spieler],
         text: `${p.name} kauft eine Entwicklungskarte: ${ENTW_NAME[typ]}.`,
@@ -533,6 +551,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
         for (const k of r) {
           s.bank[k]--;
           p.hand[k]++;
+          bewege(s, null, a.spieler, k, 1);
         }
         log(s, `${p.name} spielt Erfindung und nimmt ${formatRohstoffe(bedarf)}.`);
       } else if (a.typ === 'MONOPOL_SPIELEN') {
@@ -541,6 +560,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
         for (const q of s.spieler) {
           if (q.id === a.spieler) continue;
           n += q.hand[a.rohstoff];
+          bewege(s, q.id, a.spieler, a.rohstoff, q.hand[a.rohstoff]);
           q.hand[a.rohstoff] = 0;
         }
         p.hand[a.rohstoff] += n;
@@ -568,6 +588,8 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       s.bank[a.gib] += v;
       s.bank[a.nimm]--;
       p.hand[a.nimm]++;
+      bewege(s, a.spieler, null, a.gib, v);
+      bewege(s, null, a.spieler, a.nimm, 1);
       log(s, `${p.name} tauscht ${v}× ${ROHSTOFF_NAME[a.gib]} gegen 1× ${ROHSTOFF_NAME[a.nimm]} (${v}:1).`);
       return null;
     }
@@ -608,6 +630,8 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       for (const r of ROHSTOFFE) {
         von.hand[r] += o.nimm[r] - o.gib[r];
         p.hand[r] += o.gib[r] - o.nimm[r];
+        bewege(s, o.von, a.spieler, r, o.gib[r]);
+        bewege(s, a.spieler, o.von, r, o.nimm[r]);
       }
       s.angebote = s.angebote.filter((x) => x.id !== o.id);
       log(s, `${von.name} und ${p.name} handeln: ${formatRohstoffe(o.gib)} gegen ${formatRohstoffe(o.nimm)}.`);

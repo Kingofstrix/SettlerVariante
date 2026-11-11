@@ -47,6 +47,16 @@ export interface TimerAnzeige {
   art: TimerArt;
 }
 
+export interface ChatEintrag {
+  nr: number;
+  name: string;
+  farbe: string;
+  text: string;
+  zeit: number;
+}
+
+export const CHAT_MAX_LAENGE = 200;
+
 export interface SitzungsZustand {
   status: 'verbinde' | 'lobby' | 'spiel' | 'beendet';
   /** Verbindung zum Host steht (beim Host selbst: Signalisierungsserver erreichbar). */
@@ -64,6 +74,7 @@ export interface SitzungsZustand {
   verbunden: boolean[];
   timer: TimerAnzeige | null;
   pausiert: boolean;
+  chat: ChatEintrag[];
   /** Letzte Ablehnung durch den Host, für einen Toast. */
   hinweis: { nr: number; text: string } | null;
 }
@@ -87,6 +98,7 @@ export interface Sitzung {
   abonniere(cb: () => void): () => void;
   aktion(a: Absicht): void;
   profil(name: string, farbe: string): void;
+  chat(text: string): void;
   verlassen(): void;
   readonly host: HostFunktionen | null;
 }

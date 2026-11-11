@@ -108,7 +108,17 @@ Wo jede Regel umgesetzt und getestet ist. Pfade relativ zu `src/engine/` bzw. `t
 | Deterministisch mit Seed | `engine/rng.ts` | „gleicher Seed, gleiche Aktionen -> gleicher Zustand“ |
 | 500 Zufallsspiele ohne Ausnahme, Kartenbilanz stimmt | `engine/pruefung.ts` | `simulation.test.ts` |
 
+## Zusatzfunktionen
+
+| Anforderung | Umsetzung | Test |
+|---|---|---|
+| Bankübersicht (Bank und im Umlauf je Rohstoff) | `ui/Teile.tsx`: `BankAnzeige` | von Hand (Screenshots) |
+| Chat (Host verteilt, Spam-Bremse, 200 Zeichen, Beamer nur lesen, im Export) | `netz/host.ts`: `chatHinzu`; `netz/protokoll.ts`; `ui/Chat.tsx` | `host.test.ts` „verteilt Nachrichten an alle, bremst Spam …“ |
+| Gut sichtbare Handelsangebote | `ui/Teile.tsx`: `AngebotsListe` | von Hand |
+| Würfel in der Mitte, danach an den Rand | `ui/WuerfelBuehne.tsx` | von Hand |
+| Kartenflug Hand ↔ Bank ↔ Mitspieler | `engine/engine.ts`: `bewege`; `engine/sicht.ts`; `ui/animation.tsx` | `engine.test.ts` „Kartenbewegungen …“ (3 Tests, u. a. kein Verraten des Rohstoffs an Dritte) |
+
 ## Nur von Hand geprüft (kein automatischer Test)
 
-- Oberfläche: Platzieren mit Vorschau, Handelsdialog, Abwurfdialog, Beameransicht, Tooltips, Töne.
+- Oberfläche: Platzieren mit Vorschau, Handelsdialog, Abwurfdialog, Beameransicht, Tooltips, Töne, Würfelbühne, Kartenflug, Bankübersicht, Chat.
 - WebRTC über PeerJS: im Headless-Chrome gegen einen lokalen PeerJS-Server durchgespielt (Beitritt, Start, doppelter Tab, Host-Reload, Trennung). **Nicht** geprüft: der öffentliche PeerJS-Server und echte Uni-Netze.

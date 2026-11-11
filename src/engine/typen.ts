@@ -136,6 +136,15 @@ export interface Handelsangebot {
   nimm: Rohstoffe; // was "von" bekommt
 }
 
+/** Eine Kartenbewegung. von/nach: Spielerindex oder null für die Bank. */
+export interface Bewegung {
+  nr: number;
+  von: number | null;
+  nach: number | null;
+  r: Rohstoff | 'entw';
+  n: number;
+}
+
 export interface LogEintrag {
   nr: number;
   text: string;
@@ -174,6 +183,9 @@ export interface GameState {
   gewinner: number | null;
   log: LogEintrag[];
   logNr: number;
+  /** Die letzten Kartenbewegungen (für Animationen), mit fortlaufender Nummer. */
+  bewegungen: Bewegung[];
+  bewegungNr: number;
 }
 
 // Aktionen (Intentionen). "spieler" setzt immer der Host anhand der Verbindung.

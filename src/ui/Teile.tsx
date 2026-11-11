@@ -1,10 +1,11 @@
 // Bausteine, die Spieler- und Beameransicht gemeinsam nutzen.
 import type { JSX } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
-import type { Sicht } from '../engine';
-import { farbHex, type TimerAnzeige } from '../netz/sitzung';
+import { ROHSTOFFE, ROHSTOFF_NAME, kartenProRohstoff, type Handelsangebot, type Rohstoffe, type Sicht } from '../engine';
+import { farbHex, type Absicht, type TimerAnzeige } from '../netz/sitzung';
+import { RohstoffListe } from './Dialoge';
 import { useRestzeit } from './hooks';
-import { EntwIcon, KartenIcon, Wuerfel } from './Icons';
+import { EntwIcon, KartenIcon, RohstoffIcon, Wuerfel } from './Icons';
 
 /** Kurzer Text, was gerade passiert. */
 export function statusText(sicht: Sicht): { text: string; ich: boolean } {
@@ -64,7 +65,7 @@ export function SpielerTafel({ sicht, verbunden }: { sicht: Sicht; verbunden: bo
         const dran = sicht.amZug.includes(p.id);
         const punkte = sicht.endstand ? sicht.endstand[p.id] : p.id === sicht.ich ? sicht.eigenePunkte! : p.punkte;
         return (
-          <div class={`spielerzeile ${dran ? 'dran' : ''} ${p.id === sicht.ich ? 'ich' : ''}`}>
+          <div class={`spielerzeile ${dran ? 'dran' : ''} ${p.id === sicht.ich ? 'ich' : ''}`} data-sp={p.id}>
             <i class="punkt gross" style={{ background: farbHex(p.farbe) }} />
             <div class="sname">
               <b>{p.name}</b>
@@ -121,15 +122,173 @@ export function LogListe({ sicht, max }: { sicht: Sicht; max?: number }): JSX.El
   );
 }
 
-export function WurfAnzeige({ sicht, groesse = 44 }: { sicht: Sicht; groesse?: number }): JSX.Element | null {
+export function WurfAnzeige({
+  sicht,
+  groesse = 44,
+  versteckt = false,
+  still = false,
+}: {
+  sicht: Sicht;
+  groesse?: number;
+  versteckt?: boolean;
+  /** ohne eigene Wurf-Animation (die Würfel sind gerade aus der Mitte hierher geflogen) */
+  still?: boolean;
+}): JSX.Element | null {
   if (!sicht.wurf) return null;
+  if (versteckt) return <div class="wurf" style={{ visibility: 'hidden' }}><Wuerfel wert={1} groesse={groesse} /></div>;
   const summe = sicht.wurf[0] + sicht.wurf[1];
   // key: neue Animation bei jedem Wurf
   return (
-    <div class="wurf" key={`${sicht.zugNr}`}>
+    <div class={`wurf ${still ? 'still' : ''}`} key={`${sicht.zugNr}`}>
       <Wuerfel wert={sicht.wurf[0]} groesse={groesse} />
       <Wuerfel wert={sicht.wurf[1]} groesse={groesse} rot />
       <span class={`wurfsumme ${summe === 7 ? 'sieben' : ''}`}>= {summe}</span>
+    </div>
+  );
+}
+
+/** Bankübersicht: Karten je Rohstoff in der Bank und bei den Spielern (Rest bis zur Gesamtzahl). */
+export function BankAnzeige({ sicht }: { sicht: Sicht }): JSX.Element {
+  const gesamt = kartenProRohstoff(sicht.spieler.length);
+  return (
+    <div class="bank" aria-label="Bank">
+      <div class="bank-kopf">
+        <b>Bank</b>
+        <small>
+          oben: in der Bank · unten: bei Spielern (von je {gesamt})
+        </small>
+      </div>
+      <div class="bank-stapel-reihe">
+        {ROHSTOFFE.map((r) => {
+          const n = sicht.bank[r];
+          return (
+            <div
+              class={`bank-stapel ${n === 0 ? 'leer' : n <= 3 ? 'knapp' : ''}`}
+              data-bank={r}
+              data-tip={`${ROHSTOFF_NAME[r]}: ${n} in der Bank, ${gesamt - n} bei Spielern`}
+            >
+              <RohstoffIcon typ={r} groesse={20} />
+              <b>{n}</b>
+              <small>{gesamt - n}</small>
+            </div>
+          );
+        })}
+        <div class="bank-stapel entwstapel" data-bank="entw" data-tip={`${sicht.stapelAnzahl} Entwicklungskarten im Stapel`}>
+          <KartenIcon entw groesse={20} />
+          <b>{sicht.stapelAnzahl}</b>
+          <small>Entw.</small>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function fehltFuer(hand: Rohstoffe, bedarf: Rohstoffe): Partial<Rohstoffe> | null {
+  const f: Partial<Rohstoffe> = {};
+  let fehlt = false;
+  for (const r of ROHSTOFFE) {
+    if (hand[r] < bedarf[r]) {
+      f[r] = bedarf[r] - hand[r];
+      fehlt = true;
+    }
+  }
+  return fehlt ? f : null;
+}
+
+/** Offene Handelsangebote. Angebote an mich stehen groß oben, aus meiner Sicht formuliert. */
+export function AngebotsListe({
+  sicht,
+  aktion,
+  onGegen,
+}: {
+  sicht: Sicht;
+  aktion?: (a: Absicht) => void;
+  onGegen?: (o: Handelsangebot) => void;
+}): JSX.Element | null {
+  if (sicht.phase !== 'aktion' || sicht.angebote.length === 0) return null;
+  const ich = sicht.ich;
+  const hand = ich !== null ? sicht.spieler[ich].hand : null;
+  const name = (i: number): string => sicht.spieler[i].name;
+  const fuerMich = sicht.angebote.filter((o) => ich !== null && o.an.includes(ich));
+  const meine = sicht.angebote.filter((o) => o.von === ich);
+  const andere = sicht.angebote.filter((o) => !fuerMich.includes(o) && !meine.includes(o));
+  return (
+    <div class="angebote" aria-live="polite">
+      {fuerMich.map((o) => {
+        const von = sicht.spieler[o.von];
+        const fehlt = hand ? fehltFuer(hand, o.nimm) : null;
+        return (
+          <div class="angebot fuer-mich" key={o.id} style={{ '--sf': farbHex(von.farbe) }}>
+            <div class="angebot-kopf">
+              <i class="punkt gross" style={{ background: farbHex(von.farbe) }} />
+              <b>{von.name}</b> {o.von === sicht.aktiv ? 'bietet dir einen Handel an' : 'macht dir ein Gegenangebot'}
+            </div>
+            <div class="angebot-tausch">
+              <div class="tauschseite bekommst">
+                <small>Du bekommst</small>
+                <RohstoffListe r={o.gib} groesse={30} namen />
+              </div>
+              <div class="tauschpfeil" aria-hidden="true">
+                ⇄
+              </div>
+              <div class="tauschseite gibst">
+                <small>Du gibst</small>
+                <RohstoffListe r={o.nimm} groesse={30} namen />
+              </div>
+            </div>
+            {fehlt && (
+              <p class="fehlt">
+                Dir fehlt: <RohstoffListe r={fehlt} />
+              </p>
+            )}
+            {aktion && (
+              <div class="angebot-knoepfe">
+                <button class="knopf haupt" disabled={!!fehlt} onClick={() => aktion({ typ: 'HANDEL_ANNEHMEN', angebot: o.id })}>
+                  ✓ Annehmen
+                </button>
+                <button class="knopf" onClick={() => aktion({ typ: 'HANDEL_ABLEHNEN', angebot: o.id })}>
+                  ✕ Ablehnen
+                </button>
+                {onGegen && o.von === sicht.aktiv && (
+                  <button class="knopf" onClick={() => onGegen(o)}>
+                    ⇄ Gegenangebot
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {meine.map((o) => (
+        <div class="angebot eigenes" key={o.id}>
+          <div>
+            <b>Dein Angebot:</b> du gibst <RohstoffListe r={o.gib} groesse={22} /> und bekommst <RohstoffListe r={o.nimm} groesse={22} />
+          </div>
+          <div class="angebot-knoepfe">
+            {o.an.map((i) => (
+              <span class="status-chip wartet">
+                <i class="punkt" style={{ background: farbHex(sicht.spieler[i].farbe) }} /> {name(i)}: überlegt …
+              </span>
+            ))}
+            {o.abgelehnt.map((i) => (
+              <span class="status-chip abgelehnt">
+                <i class="punkt" style={{ background: farbHex(sicht.spieler[i].farbe) }} /> {name(i)}: abgelehnt
+              </span>
+            ))}
+            {aktion && (
+              <button class="knopf klein" onClick={() => aktion({ typ: 'HANDEL_ZURUECKZIEHEN', angebot: o.id })}>
+                Zurückziehen
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      {andere.map((o) => (
+        <div class="angebot fremd" key={o.id}>
+          <i class="punkt" style={{ background: farbHex(sicht.spieler[o.von].farbe) }} /> <b>{name(o.von)}</b> bietet <RohstoffListe r={o.gib} /> für{' '}
+          <RohstoffListe r={o.nimm} /> <small>an {o.an.map(name).join(', ') || '–'}</small>
+        </div>
+      ))}
     </div>
   );
 }

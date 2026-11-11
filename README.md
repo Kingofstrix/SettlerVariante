@@ -5,6 +5,7 @@ Browser-Mehrspielerspiel für 3–6 Personen nach dem Prinzip „siedeln, handel
 - **Statische Web-App** (Vite, TypeScript, Preact, SVG), Hosting auf GitHub Pages.
 - **Peer-to-Peer über WebRTC** (PeerJS). Der Browser des Hosts rechnet das ganze Spiel, alle anderen treten mit einem Raumcode bei.
 - Standardregeln plus 5–6-Spieler-Erweiterung mit **Sonderbauphase**, Zugtimer, Beameransicht.
+- **Bankübersicht** (Karten je Rohstoff in der Bank und bei den Spielern), **Chat**, gut sichtbare **Handelsangebote**, **Würfel in der Brettmitte** und **Kartenflug-Animationen** zwischen Hand, Bank und Mitspielern.
 
 Namen, Grafiken und Texte sind eigene; nur die Spielmechanik orientiert sich am bekannten Brettspiel.
 
@@ -45,6 +46,14 @@ Zum schnellen Ausprobieren gibt es außerdem auf der Startseite „Lokal an eine
 3. **Beamer-Laptop** öffnet die Seite, gibt den Code ein und klickt „Als Beamer verbinden“. Im Spiel oben rechts ⛶ für Vollbild.
 4. In der Lobby prüft der Host den **Verbindungstest**: Status, Latenz, „direkt“ oder „Relay“ für jeden Spieler.
 5. Einstellungen wählen (Brett, Siegpunkte, Timer) und „Spiel starten“ (ab 3 Spielern).
+
+Im Spiel:
+
+- **Würfeln:** Wer dran ist, sieht die Würfel groß in der Brettmitte. Würfeln per Klick, Leertaste oder Enter. Ein Ritter lässt sich vorher unten in der Handleiste ausspielen. Nach dem Wurf fliegen die Würfel mit dem Ergebnis an den Rand.
+- **Bank:** In der Seitenleiste steht je Rohstoff oben die Zahl in der Bank, unten die Zahl bei allen Spielern zusammen. Daneben der Stapel der Entwicklungskarten.
+- **Handel:** Angebote an dich erscheinen groß oben über dem Brett, aus deiner Sicht formuliert („Du bekommst … / Du gibst …“), mit Annehmen, Ablehnen und Gegenangebot. Wer ein Angebot macht, sieht pro Mitspieler, ob er noch überlegt oder abgelehnt hat.
+- **Chat:** Reiter „Chat“ neben dem Verlauf (auch in der Lobby). Ungelesene Nachrichten zeigt eine Zahl am Reiter. Höchstens 5 Nachrichten in 10 Sekunden pro Person, 200 Zeichen je Nachricht. Der Beamer liest nur mit.
+- **Animationen:** Karten fliegen zwischen Hand, Bank und Mitspielern. Bei fremden Spielern ist nur dann zu sehen, welcher Rohstoff fliegt, wenn die Bank beteiligt ist (das ist ohnehin öffentlich). Diebstahl und Handel zwischen zwei anderen zeigen verdeckte Karten. Mit „Bewegung reduzieren“ im Betriebssystem sind alle Animationen aus.
 
 Tipps:
 
@@ -124,6 +133,7 @@ src/engine/   Reine Regel-Engine (kein DOM, kein Netz). anwenden(state, aktion) 
   engine.ts     Reducer mit allen Aktionen, Sonderkarten, Sonderbauphase, Sieg
   sicht.ts      Gefilterte Sicht je Spieler / Beamer
   pruefung.ts   Invarianten (Kartenbilanz …) und Zufallsaktionen für die Simulation
+                Kartenbewegungen (für Animationen) stehen im Zustand als `bewegungen`
   rng.ts        Seeded RNG (mulberry32); der Seed steht im Log und im Host-Menü
 src/netz/     Host-autoritatives Netzwerk
   protokoll.ts  Versionierte JSON-Nachrichten mit Prüfung (Ungültiges wird ignoriert)
@@ -131,7 +141,8 @@ src/netz/     Host-autoritatives Netzwerk
   client.ts     Spieler/Beamer: Absichten senden, Sicht anzeigen, automatisch neu verbinden
   transport.ts  PeerJS (WebRTC) und BroadcastChannel (Dev-Modus), Netzwerk-Konfiguration
   lokal.ts      Hot-Seat an einem Gerät
-src/ui/       Preact-Oberfläche: Start, Lobby, Spieler- und Beameransicht, Dialoge, SVG-Brett
+src/ui/       Preact-Oberfläche: Start, Lobby, Spieler- und Beameransicht, Dialoge, SVG-Brett,
+              Chat, Würfelbühne, Kartenflug (animation.tsx)
 tests/        Vitest: Brett, Regeln, Engine, Host, Simulation
 ```
 

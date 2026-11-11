@@ -32,6 +32,7 @@ export class LokalSitzung extends Beobachtbar implements Sitzung {
       verbunden: this.spiel.spieler.map(() => true),
       timer: null,
       pausiert: false,
+      chat: [],
       hinweis: null,
     };
   }
@@ -59,5 +60,6 @@ export class LokalSitzung extends Beobachtbar implements Sitzung {
   }
 
   profil(): void {}
+  chat(): void {}
   verlassen(): void {}
 }

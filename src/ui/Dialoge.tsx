@@ -57,12 +57,13 @@ function Zaehler({ wert, max, onChange }: { wert: number; max: number; onChange:
   );
 }
 
-export function RohstoffListe({ r }: { r: Partial<Rohstoffe> }): JSX.Element {
+export function RohstoffListe({ r, groesse = 18, namen = false }: { r: Partial<Rohstoffe>; groesse?: number; namen?: boolean }): JSX.Element {
   return (
     <span class="rliste">
       {ROHSTOFFE.filter((k) => (r[k] ?? 0) > 0).map((k) => (
         <span class="rchip" title={ROHSTOFF_NAME[k]}>
-          {r[k]}× <RohstoffIcon typ={k} groesse={18} />
+          {r[k]}× <RohstoffIcon typ={k} groesse={groesse} />
+          {namen && <span class="rname">{ROHSTOFF_NAME[k]}</span>}
         </span>
       ))}
     </span>

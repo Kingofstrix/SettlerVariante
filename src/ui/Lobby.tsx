@@ -2,6 +2,7 @@
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import { FARBEN, farbHex, type Einstellungen, type Sitzung } from '../netz/sitzung';
+import { ChatBox } from './Chat';
 import { HilfeDialog } from './Dialoge';
 import { useSitzung } from './hooks';
 
@@ -178,6 +179,11 @@ export function Lobby({ sitzung, onVerlassen }: { sitzung: Sitzung; onVerlassen:
           ) : (
             <p class="warte">Warte auf den Host …</p>
           )}
+        </section>
+
+        <section class="tafel lobby-chat">
+          <h2>Chat</h2>
+          <ChatBox eintraege={z.chat} meinName={ich?.name ?? null} onSenden={ich ? (text) => sitzung.chat(text) : null} />
         </section>
       </div>
       {hilfe && <HilfeDialog onZu={() => setHilfe(false)} />}

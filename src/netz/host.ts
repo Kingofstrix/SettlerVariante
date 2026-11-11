@@ -11,7 +11,9 @@ import {
 import { PROTOKOLL_VERSION, pruefeClientNachricht, type EndeGrund, type HostNachricht, type SichtOhneBrett } from './protokoll';
 import {
   Beobachtbar,
+  CHAT_MAX_LAENGE,
   FARBEN,
+  type ChatEintrag,
   STANDARD_EINSTELLUNGEN,
   type Absicht,
   type Einstellungen,
@@ -36,6 +38,8 @@ export interface HostDaten {
   spielerTokens: string[];
   spielNr: number;
   pausiert: boolean;
+  chat: ChatEintrag[];
+  chatNr: number;
 }
 
 /** Prüft einen importierten Spielstand grob auf die erwartete Form. */
@@ -46,16 +50,20 @@ export function pruefeHostDaten(d: unknown): HostDaten | null {
   if (typeof x.einstellungen !== 'object' || x.einstellungen === null) return null;
   if (x.spiel !== null && (typeof x.spiel !== 'object' || !Array.isArray(x.spiel.spieler) || !x.spiel.brett)) return null;
   if (!x.sitze.every((s) => s && typeof s.token === 'string' && typeof s.name === 'string' && typeof s.farbe === 'string')) return null;
+  // Ältere Spielstände ohne Bewegungsliste ergänzen
+  const spiel = x.spiel ? { ...x.spiel, bewegungen: x.spiel.bewegungen ?? [], bewegungNr: x.spiel.bewegungNr ?? 0 } : null;
   return {
     v: 1,
     raumCode: x.raumCode,
     hostToken: typeof x.hostToken === 'string' ? x.hostToken : '',
     sitze: x.sitze,
     einstellungen: { ...STANDARD_EINSTELLUNGEN, ...x.einstellungen },
-    spiel: x.spiel ?? null,
+    spiel,
     spielerTokens: x.spielerTokens,
     spielNr: typeof x.spielNr === 'number' ? x.spielNr : 1,
     pausiert: !!x.pausiert,
+    chat: Array.isArray(x.chat) ? x.chat.slice(-CHAT_BEHALTEN) : [],
+    chatNr: typeof x.chatNr === 'number' ? x.chatNr : 0,
   };
 }
 
@@ -69,6 +77,8 @@ interface Gast {
   pings: Map<number, number>;
   /** Spielnummer, für die das Brett schon gesendet wurde. */
   brettFuer: number;
+  /** Zeitpunkte der letzten Chatnachrichten (Spam-Bremse). */
+  chatZeiten: number[];
 }
 
 interface HostTimer {
@@ -83,6 +93,9 @@ interface HostTimer {
 const PING_MS = 2000;
 const TOT_MS = 8000;
 const LOG_SENDEN = 80;
+const CHAT_BEHALTEN = 100;
+/** Höchstens so viele Chatnachrichten je Spieler in 10 Sekunden. */
+const CHAT_PRO_10S = 5;
 
 /** Schlüssel des aktuellen Zeitabschnitts: Wechselt er, beginnt ein neuer Timer. */
 function schritt(s: GameState): [string, TimerArt] {
@@ -127,6 +140,7 @@ export class Host extends Beobachtbar implements Sitzung {
       verbunden: [],
       timer: null,
       pausiert: daten.pausiert,
+      chat: daten.chat,
       hinweis: null,
     };
     this.host = {
@@ -157,6 +171,8 @@ export class Host extends Beobachtbar implements Sitzung {
         spielerTokens: [],
         spielNr: 0,
         pausiert: false,
+        chat: [],
+        chatNr: 0,
       };
       const t = transport();
       try {
@@ -212,7 +228,7 @@ export class Host extends Beobachtbar implements Sitzung {
   // ---------- Verbindungen ----------
 
   private neueVerbindung(conn: Verbindung): void {
-    const g: Gast = { conn, token: null, rolle: null, letzterPong: Date.now(), latenz: null, weg: null, pings: new Map(), brettFuer: -1 };
+    const g: Gast = { conn, token: null, rolle: null, letzterPong: Date.now(), latenz: null, weg: null, pings: new Map(), brettFuer: -1, chatZeiten: [] };
     this.gaeste.add(g);
     conn.onDaten = (d) => {
       const n = pruefeClientNachricht(d);
@@ -230,6 +246,12 @@ export class Host extends Beobachtbar implements Sitzung {
           g.letzterPong = Date.now();
           return;
         }
+        case 'chat':
+          if (g.rolle !== 'spieler' || !g.token) return;
+          g.chatZeiten = g.chatZeiten.filter((t) => Date.now() - t < 10000);
+          if (g.chatZeiten.length >= CHAT_PRO_10S) return; // Spam: still verwerfen
+          g.chatZeiten.push(Date.now());
+          return this.chatHinzu(g.token, n.text);
         case 'profil':
           if (g.rolle === 'spieler' && g.token && !this.daten.spiel) this.setzeProfil(g.token, n.name, n.farbe);
           return;
@@ -270,6 +292,7 @@ export class Host extends Beobachtbar implements Sitzung {
     if (rolle === 'beamer') {
       g.rolle = 'beamer';
       g.token = token;
+      this.sendeChat(g);
       return this.rundsenden();
     }
     const bekannt = this.daten.sitze.some((s) => s.token === token);
@@ -287,6 +310,30 @@ export class Host extends Beobachtbar implements Sitzung {
     this.timerAktualisieren();
     this.speichern();
     this.rundsenden();
+    this.sendeChat(g);
+  }
+
+  // ---------- Chat ----------
+
+  private sendeChat(g: Gast): void {
+    this.sende(g, { v: PROTOKOLL_VERSION, t: 'chat', eintraege: this.daten.chat });
+  }
+
+  private chatHinzu(token: string, roh: string): void {
+    const sitz = this.daten.sitze.find((s) => s.token === token);
+    if (!sitz) return;
+    const text = roh.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, CHAT_MAX_LAENGE);
+    if (!text) return;
+    const d = this.daten;
+    d.chat = [...d.chat, { nr: ++d.chatNr, name: sitz.name, farbe: sitz.farbe, text, zeit: Date.now() }].slice(-CHAT_BEHALTEN);
+    this.speichern();
+    for (const g of this.gaeste) if (g.rolle) this.sendeChat(g);
+    this.zustand = { ...this.zustand, chat: d.chat };
+    this.melde();
+  }
+
+  chat(text: string): void {
+    this.chatHinzu(this.daten.hostToken, text);
   }
 
   private setzeProfil(token: string, name: string, farbe: string, still = false): void {

@@ -107,7 +107,7 @@ describe('Lobby', () => {
     expect(alt.letzte('ende')!.grund).toBe('version');
     // Müll bringt den Host nicht aus dem Tritt
     g[0].sende('kaputt');
-    g[0].sende({ v: 1, t: 'absicht', nr: 1, aktion: { typ: 'WUERFELN' } });
+    g[0].sende({ v: PROTOKOLL_VERSION, t: 'absicht', nr: 1, aktion: { typ: 'WUERFELN' } });
     expect(h.zustand.sitze.length).toBe(4);
   });
   it('Start erst ab 3 Spielern', async () => {
@@ -301,5 +301,36 @@ describe('Host-Ausfall', () => {
     expect(alterHost.letzte('spiel')!.sicht.ich).toBe(daten.spielerTokens.indexOf(HOST_TOKEN));
     expect(h2.zustand.verbunden.filter(Boolean).length).toBe(2);
     h2.verlassen();
+  });
+});
+
+describe('Chat', () => {
+  it('verteilt Nachrichten an alle, bremst Spam, Beamer darf nur lesen, bleibt beim Export erhalten', async () => {
+    const { t, h, g } = await raum(2);
+    const beamer = t.gast('beamer-token-9', 'B', 'beamer');
+    g[0].sende({ v: PROTOKOLL_VERSION, t: 'chat', text: '  Hallo <b>zusammen</b>\n ' });
+    expect(g[1].letzte('chat')!.eintraege.at(-1)).toMatchObject({ name: 'Gast0', text: 'Hallo <b>zusammen</b>' });
+    expect(beamer.letzte('chat')!.eintraege.length).toBe(1);
+    expect(h.zustand.chat.length).toBe(1);
+    h.chat('Host hier');
+    expect(g[0].letzte('chat')!.eintraege.at(-1)).toMatchObject({ name: 'Anna', text: 'Host hier' });
+    // Beamer kann nicht schreiben, leere Nachrichten werden verworfen
+    beamer.sende({ v: PROTOKOLL_VERSION, t: 'chat', text: 'Ich bin der Beamer' });
+    g[1].sende({ v: PROTOKOLL_VERSION, t: 'chat', text: '   ' });
+    expect(h.zustand.chat.length).toBe(2);
+    // Zu lange Nachrichten werden gekürzt
+    g[1].sende({ v: PROTOKOLL_VERSION, t: 'chat', text: 'x'.repeat(350) });
+    expect(h.zustand.chat.at(-1)!.text.length).toBe(200);
+    // Spam-Bremse: höchstens 5 in 10 Sekunden
+    for (let i = 0; i < 8; i++) g[0].sende({ v: PROTOKOLL_VERSION, t: 'chat', text: `Spam ${i}` });
+    expect(h.zustand.chat.filter((c) => c.name === 'Gast0').length).toBe(5);
+    vi.advanceTimersByTime(10500);
+    g[0].sende({ v: PROTOKOLL_VERSION, t: 'chat', text: 'wieder da' });
+    expect(h.zustand.chat.at(-1)!.text).toBe('wieder da');
+    // Neuer Mitspieler bekommt den bisherigen Verlauf
+    const spaet = t.gast(tok(5), 'Spät');
+    expect(spaet.letzte('chat')!.eintraege.length).toBe(h.zustand.chat.length);
+    // Export enthält den Chat
+    expect(pruefeHostDaten(JSON.parse(h.host.exportieren()))!.chat.length).toBe(h.zustand.chat.length);
   });
 });

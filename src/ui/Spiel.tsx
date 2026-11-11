@@ -22,7 +22,10 @@ import { DEV } from '../netz/speicher';
 import { Brett, KEINE_ZIELE, type Ziele } from './Brett';
 import { AbwerfenDialog, ErfindungDialog, HandelDialog, HilfeDialog, Modal, MonopolDialog, RohstoffListe, StehlenDialog } from './Dialoge';
 import { EntwIcon, ROHSTOFF_FARBE, RohstoffIcon } from './Icons';
-import { LogListe, SpielerTafel, TimerBalken, WurfAnzeige, statusText } from './Teile';
+import { useKartenFluege } from './animation';
+import { ChatEingabe, ChatVerlauf } from './Chat';
+import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WurfAnzeige, statusText } from './Teile';
+import { WuerfelBuehne, useWuerfelAnimation } from './WuerfelBuehne';
 import { toast, useRestzeit, useSitzung } from './hooks';
 import { setzeTon, ton, tonAn } from './ton';
 
@@ -82,9 +85,11 @@ function useEreignisse(z: SitzungsZustand, sicht: Sicht): void {
 
   const angebote = useRef(0);
   useEffect(() => {
-    const n = sicht.angebote.filter((o) => ich !== null && o.an.includes(ich)).length;
+    const anMich = sicht.angebote.filter((o) => ich !== null && o.an.includes(ich));
+    const n = anMich.length;
     if (n > angebote.current) {
-      toast('Neues Handelsangebot für dich');
+      const von = sicht.spieler[anMich[n - 1].von].name;
+      toast(`${von} bietet dir einen Handel an`, 'dran');
       ton('handel');
     }
     angebote.current = n;
@@ -105,6 +110,8 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
   const [, neu] = useState(0);
   const rest = useRestzeit(z.timer);
   useEreignisse(z, sicht);
+  const { anim: wuerfelAnim, starte: wuerfelStart, zentral: wurfZentral } = useWuerfelAnimation(sicht, z.hinweis?.nr);
+  useKartenFluege(sicht);
 
   const binAktiv = sicht.aktiv === ich;
   const dran = sicht.amZug.includes(ich);
@@ -190,7 +197,6 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
         ? 'Baue zuerst deine kostenlosen Straßen.'
         : null;
   const entwTypen = (['ritter', 'strassenbau', 'erfindung', 'monopol', 'siegpunkt'] as EntwTyp[]).filter((t) => mein.entw!.some((k) => k.typ === t));
-  const offeneAngebote = sicht.angebote;
 
   return (
     <div class="spiel">
@@ -219,61 +225,25 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
           onHex={(hex) => aktion({ typ: 'RAEUBER_SETZEN', hex })}
         />
 
-        {offeneAngebote.length > 0 && (
-          <div class="angebote">
-            <h3>Handelsangebote</h3>
-            {offeneAngebote.map((o) => {
-              const von = sicht.spieler[o.von];
-              const fuerMich = o.an.includes(ich);
-              const kannIch = ROHSTOFFE.every((r) => hand[r] >= o.nimm[r]);
-              return (
-                <div class="angebot" key={o.id}>
-                  <div>
-                    <i class="punkt" style={{ background: farbHex(von.farbe) }} />
-                    <b>{o.von === ich ? 'Du' : von.name}</b> {o.von === ich ? 'gibst' : 'gibt'} <RohstoffListe r={o.gib} /> für <RohstoffListe r={o.nimm} />
-                  </div>
-                  <div class="angebot-knoepfe">
-                    {o.von === ich ? (
-                      <>
-                        <small>
-                          an {o.an.map((i) => sicht.spieler[i].name).join(', ')}
-                          {o.abgelehnt.length > 0 && ` · abgelehnt: ${o.abgelehnt.map((i) => sicht.spieler[i].name).join(', ')}`}
-                        </small>
-                        <button class="knopf klein" onClick={() => aktion({ typ: 'HANDEL_ZURUECKZIEHEN', angebot: o.id })}>
-                          Zurückziehen
-                        </button>
-                      </>
-                    ) : fuerMich ? (
-                      <>
-                        <span class="tip-halter" data-tip={kannIch ? undefined : 'Dir fehlen die Rohstoffe dafür.'}>
-                          <button class="knopf klein haupt" disabled={!kannIch} onClick={() => aktion({ typ: 'HANDEL_ANNEHMEN', angebot: o.id })}>
-                            Annehmen
-                          </button>
-                        </span>
-                        <button class="knopf klein" onClick={() => aktion({ typ: 'HANDEL_ABLEHNEN', angebot: o.id })}>
-                          Ablehnen
-                        </button>
-                        {o.von === sicht.aktiv && (
-                          <button
-                            class="knopf klein"
-                            onClick={() => {
-                              setGegen(o);
-                              setDialog('handel');
-                            }}
-                          >
-                            Gegenangebot
-                          </button>
-                        )}
-                      </>
-                    ) : (
-                      <small>nicht an dich</small>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <AngebotsListe
+          sicht={sicht}
+          aktion={aktion}
+          onGegen={(o) => {
+            setGegen(o);
+            setDialog('handel');
+          }}
+        />
+
+        <WuerfelBuehne
+          anim={wuerfelAnim}
+          wartet={sicht.phase === 'wuerfeln' && binAktiv && !wuerfelAnim}
+          pausiert={z.pausiert}
+          onWuerfeln={() => {
+            if (z.pausiert) return;
+            wuerfelStart();
+            aktion({ typ: 'WUERFELN' });
+          }}
+        />
 
         {sitzung instanceof LokalSitzung && (
           <div class="perspektive">
@@ -316,12 +286,10 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
 
         <div class="aktionen">
           <div class="wuerfelzeile">
-            {sicht.phase === 'wuerfeln' && binAktiv ? (
-              <button class="knopf haupt riesig" disabled={z.pausiert} onClick={() => aktion({ typ: 'WUERFELN' })}>
-                🎲 Würfeln
-              </button>
+            {sicht.phase === 'wuerfeln' && binAktiv && !wuerfelAnim ? (
+              <span class="wuerfel-hinweis">🎲 Würfle in der Brettmitte</span>
             ) : (
-              <WurfAnzeige sicht={sicht} />
+              <WurfAnzeige sicht={sicht} versteckt={!!wuerfelAnim} still={wurfZentral} />
             )}
           </div>
           <div class="baumenue">
@@ -343,13 +311,14 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
             })}
           </div>
         </div>
-        <LogListe sicht={sicht} />
+        <BankAnzeige sicht={sicht} />
+        <VerlaufUndChat z={z} sitzung={sitzung} />
       </aside>
 
       <footer class="handleiste">
         <div class="hand">
           {ROHSTOFFE.map((r) => (
-            <div class={`karte ${hand[r] === 0 ? 'leer' : ''}`} style={{ '--kf': ROHSTOFF_FARBE[r] }} data-tip={ROHSTOFF_NAME[r]}>
+            <div class={`karte ${hand[r] === 0 ? 'leer' : ''}`} style={{ '--kf': ROHSTOFF_FARBE[r] }} data-tip={ROHSTOFF_NAME[r]} data-hand={r}>
               <RohstoffIcon typ={r} groesse={30} />
               <span class="kname">{ROHSTOFF_NAME[r]}</span>
               <b>{hand[r]}</b>
@@ -531,5 +500,54 @@ export function Menue({ sitzung, z, onZu, onVerlassen }: { sitzung: Sitzung; z: 
         </button>
       </div>
     </Modal>
+  );
+}
+
+/** Seitenleiste unten: Spielverlauf und Chat als Reiter, mit Zähler für ungelesene Nachrichten. */
+export function VerlaufUndChat({ z, sitzung }: { z: SitzungsZustand; sitzung: Sitzung }): JSX.Element {
+  const [reiter, setReiter] = useState<'log' | 'chat'>('log');
+  const letzte = z.chat.at(-1)?.nr ?? 0;
+  const [gelesen, setGelesen] = useState(letzte);
+  const sicht = z.sicht!;
+  const meinName = sicht.ich !== null ? sicht.spieler[sicht.ich].name : null;
+  const mitChat = z.rolle !== 'lokal';
+  const darfSchreiben = z.rolle !== 'beamer' && sicht.ich !== null;
+
+  useEffect(() => {
+    if (reiter === 'chat') setGelesen(letzte);
+  }, [reiter, letzte]);
+
+  // Neue Nachricht von anderen, während der Verlauf offen ist: kurz anzeigen
+  const gemeldet = useRef(letzte);
+  useEffect(() => {
+    const neu = z.chat.filter((c) => c.nr > gemeldet.current && c.name !== meinName);
+    gemeldet.current = letzte;
+    if (reiter === 'log' && neu.length) {
+      const c = neu[neu.length - 1];
+      toast(`💬 ${c.name}: ${c.text.length > 60 ? c.text.slice(0, 60) + ' …' : c.text}`);
+    }
+  }, [letzte]);
+
+  const ungelesen = z.chat.filter((c) => c.nr > gelesen && c.name !== meinName).length;
+  if (!mitChat) return <LogListe sicht={sicht} />;
+  return (
+    <div class="verlauf-chat">
+      <div class="reiter" role="tablist">
+        <button role="tab" aria-selected={reiter === 'log'} class={`reiter-knopf ${reiter === 'log' ? 'an' : ''}`} onClick={() => setReiter('log')}>
+          Verlauf
+        </button>
+        <button role="tab" aria-selected={reiter === 'chat'} class={`reiter-knopf ${reiter === 'chat' ? 'an' : ''}`} onClick={() => setReiter('chat')}>
+          Chat {ungelesen > 0 && <span class="zaehler-punkt">{ungelesen}</span>}
+        </button>
+      </div>
+      {reiter === 'log' ? (
+        <LogListe sicht={sicht} />
+      ) : (
+        <div class="chat">
+          <ChatVerlauf eintraege={z.chat} meinName={meinName} />
+          {darfSchreiben && <ChatEingabe onSenden={(text) => sitzung.chat(text)} aus={z.online ? undefined : 'Keine Verbindung …'} />}
+        </div>
+      )}
+    </div>
   );
 }

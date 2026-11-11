@@ -486,3 +486,55 @@ describe('Robustheit', () => {
     expect(lauf()).toBe(lauf());
   });
 });
+
+describe('Kartenbewegungen (für Animationen)', () => {
+  it('Bauen: Hand → Bank; Ertrag: Bank → Hand; Kauf: Entwicklungskarte zum Spieler', () => {
+    let s = leer();
+    const p = pfad(s, 10, 1);
+    setze(s, p.ecken[0], 0, 'siedlung');
+    gib(s, 0, { holz: 1, lehm: 1, wolle: 1, getreide: 1, erz: 1 });
+    s = ok(s, { typ: 'STRASSE_BAUEN', spieler: 0, kante: p.kanten[0] });
+    expect(s.bewegungen.map(({ von, nach, r, n }) => ({ von, nach, r, n }))).toEqual([
+      { von: 0, nach: null, r: 'holz', n: 1 },
+      { von: 0, nach: null, r: 'lehm', n: 1 },
+    ]);
+    s = ok(s, { typ: 'ENTW_KAUFEN', spieler: 0 });
+    expect(s.bewegungen.at(-1)).toMatchObject({ von: null, nach: 0, r: 'entw', n: 1 });
+    expect(s.bewegungen.map((b) => b.nr)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+  it('Diebstahl: Dieb und Opfer sehen den Rohstoff, Dritte nicht', () => {
+    let s = leer(3);
+    gib(s, 1, { erz: 1 });
+    s.phase = 'raeuber';
+    const ziel = s.brett.hexes.find((h) => h.id !== s.raeuber)!;
+    setze(s, ziel.ecken[0], 1, 'siedlung');
+    s = ok(s, { typ: 'RAEUBER_SETZEN', spieler: 0, hex: ziel.id });
+    expect(s.bewegungen.at(-1)).toMatchObject({ von: 1, nach: 0, r: 'erz' });
+    expect(sichtFuer(s, 0).bewegungen.at(-1)!.r).toBe('erz');
+    expect(sichtFuer(s, 1).bewegungen.at(-1)!.r).toBe('erz');
+    expect(sichtFuer(s, 2).bewegungen.at(-1)!.r).toBe(null);
+    expect(sichtFuer(s, null).bewegungen.at(-1)!.r).toBe(null);
+  });
+  it('Bankhandel und Spielerhandel erzeugen Bewegungen in beide Richtungen; Liste bleibt begrenzt', () => {
+    let s = leer();
+    gib(s, 0, { holz: 4 });
+    gib(s, 1, { erz: 1 });
+    s = ok(s, { typ: 'BANKHANDEL', spieler: 0, gib: 'holz', nimm: 'wolle' });
+    expect(s.bewegungen.slice(-2).map(({ von, nach, r, n }) => [von, nach, r, n])).toEqual([
+      [0, null, 'holz', 4],
+      [null, 0, 'wolle', 1],
+    ]);
+    s = ok(s, { typ: 'HANDEL_ANBIETEN', spieler: 0, gib: { wolle: 1 }, nimm: { erz: 1 }, an: null });
+    s = ok(s, { typ: 'HANDEL_ANNEHMEN', spieler: 1, angebot: s.angebote[0].id });
+    expect(s.bewegungen.slice(-2).map(({ von, nach, r }) => [von, nach, r])).toEqual(
+      expect.arrayContaining([
+        [1, 0, 'erz'],
+        [0, 1, 'wolle'],
+      ]),
+    );
+    expect(sichtFuer(s, 2).bewegungen.slice(-2).every((b) => b.r === null)).toBe(true);
+    let t = nachSetup(spiel(4));
+    for (let i = 0; i < 300; i++) t = ok(t, { typ: 'ZEIT_ABGELAUFEN', spieler: 0 });
+    expect(t.bewegungen.length).toBeLessThanOrEqual(40);
+  });
+});

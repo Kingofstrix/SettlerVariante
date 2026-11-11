@@ -1,7 +1,7 @@
 // Gefilterte Sicht: Was ein bestimmter Spieler (oder der Beamer) sehen darf.
 import { amZug, gesamtPunkte } from './engine';
 import { oeffentlichePunkte, strassenLaenge } from './regeln';
-import { summe, type EntwKarte, type GameState, type LogEintrag, type Rohstoffe, type Spieler } from './typen';
+import { summe, type Bewegung, type EntwKarte, type GameState, type LogEintrag, type Rohstoffe, type Spieler } from './typen';
 
 export interface SpielerSicht extends Omit<Spieler, 'hand' | 'entw'> {
   /** Nur beim eigenen Spieler gefüllt, sonst null. */
@@ -14,8 +14,14 @@ export interface SpielerSicht extends Omit<Spieler, 'hand' | 'entw'> {
   strassenLaenge: number;
 }
 
+/** Bewegung aus Sicht eines Betrachters: Rohstoff unbekannt, wenn er zwischen zwei anderen Spielern wandert. */
+export interface SichtBewegung extends Omit<Bewegung, 'r'> {
+  r: Bewegung['r'] | null;
+}
+
 export interface Sicht
-  extends Omit<GameState, 'spieler' | 'stapel' | 'rngState' | 'seed' | 'log' | 'gespielteEntw'> {
+  extends Omit<GameState, 'spieler' | 'stapel' | 'rngState' | 'seed' | 'log' | 'gespielteEntw' | 'bewegungen'> {
+  bewegungen: SichtBewegung[];
   /** Eigener Spielerindex; null beim Beamer. */
   ich: number | null;
   spieler: SpielerSicht[];
@@ -36,7 +42,7 @@ function logFuer(l: LogEintrag, ich: number | null): { nr: number; text: string 
 
 /** ich = Spielerindex oder null (Beamer/Zuschauer: sieht keine Handkarten). */
 export function sichtFuer(s: GameState, ich: number | null): Sicht {
-  const { spieler, stapel, rngState: _r, seed: _s, log, gespielteEntw: _g, ...rest } = s;
+  const { spieler, stapel, rngState: _r, seed: _s, log, gespielteEntw: _g, bewegungen, ...rest } = s;
   void _r, _s, _g;
   return {
     ...rest,
@@ -52,6 +58,9 @@ export function sichtFuer(s: GameState, ich: number | null): Sicht {
       strassenLaenge: strassenLaenge(s, p.id),
     })),
     log: log.map((l) => logFuer(l, ich)),
+    bewegungen: bewegungen.map((b) =>
+      b.von !== null && b.nach !== null && b.von !== ich && b.nach !== ich ? { ...b, r: null } : b,
+    ),
     eigenePunkte: ich === null ? null : gesamtPunkte(s, ich),
     amZug: amZug(s),
     endstand: s.phase === 'ende' ? spieler.map((p) => gesamtPunkte(s, p.id)) : null,
