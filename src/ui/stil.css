@@ -1,6 +1,4 @@
 :root {
-  --akzent: #b5482a;
-  --akzent-dunkel: #8f3519;
   font-family: var(--schrift);
   color: var(--tinte);
 }
@@ -38,23 +36,25 @@ h3 {
 
 .knopf {
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--tinte);
   background: var(--weiss);
   border: 1.5px solid var(--linie);
-  border-radius: 10px;
+  border-radius: var(--rund-m);
   padding: 8px 14px;
   cursor: pointer;
-  box-shadow: 0 1px 0 rgba(60, 40, 10, 0.12);
-  transition: transform 0.08s, background 0.12s, border-color 0.12s;
+  box-shadow: 0 var(--kante) 0 var(--linie-kante);
+  transition: transform 0.08s, box-shadow 0.08s, background 0.12s, border-color 0.12s;
   white-space: nowrap;
 }
 .knopf:hover:not(:disabled) {
-  border-color: var(--akzent);
+  border-color: var(--gold-kante);
   transform: translateY(-1px);
+  box-shadow: 0 calc(var(--kante) + 1px) 0 var(--linie-kante);
 }
 .knopf:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: translateY(var(--kante));
+  box-shadow: none;
 }
 .knopf:focus-visible,
 .chip:focus-visible,
@@ -69,16 +69,22 @@ input:focus-visible {
   filter: grayscale(0.6);
 }
 .knopf.haupt {
-  background: var(--akzent);
-  border-color: var(--akzent-dunkel);
-  color: var(--weiss);
+  background: var(--gold);
+  border-color: var(--gold-kante);
+  color: var(--tinte);
+  box-shadow: 0 var(--kante) 0 var(--gold-kante);
 }
 .knopf.haupt:hover:not(:disabled) {
-  background: var(--akzent-dunkel);
+  background: var(--gold-licht);
+  box-shadow: 0 calc(var(--kante) + 1px) 0 var(--gold-kante);
+}
+.knopf.haupt:active:not(:disabled) {
+  box-shadow: none;
 }
 .knopf.klein {
+  --kante: 2px;
   padding: 3px 9px;
-  border-radius: 8px;
+  border-radius: var(--rund-s);
   font-size: 13px;
 }
 .knopf.leise {
@@ -89,6 +95,8 @@ input:focus-visible {
 }
 .knopf.leise:hover:not(:disabled) {
   background: rgba(0, 0, 0, 0.06);
+  box-shadow: none;
+  transform: none;
 }
 .knopf.riesig {
   font-size: 20px;
@@ -120,8 +128,8 @@ input:focus-visible {
   cursor: pointer;
 }
 .chip.an {
-  background: var(--tinte);
-  border-color: var(--tinte);
+  background: var(--marine);
+  border-color: var(--marine);
   color: var(--weiss);
 }
 .chip:disabled {
@@ -239,7 +247,7 @@ input:focus-visible {
   position: relative;
   min-height: 0;
   min-width: 0;
-  background: radial-gradient(ellipse at 50% 45%, var(--meer-1) 0%, var(--meer-2) 60%, var(--meer-3) 100%);
+  background: var(--wellen), radial-gradient(ellipse at 50% 42%, var(--meer-1) 0%, var(--meer-2) 58%, var(--meer-3) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -252,12 +260,12 @@ input:focus-visible {
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;
-  background: rgba(255, 250, 240, 0.95);
+  background: var(--tafel);
   border-radius: 999px;
   padding: 6px 18px;
   font-weight: 700;
   font-size: 16px;
-  box-shadow: var(--schatten);
+  box-shadow: 0 var(--kante) 0 var(--linie-kante), var(--schatten);
   display: flex;
   gap: 10px;
   align-items: center;
@@ -266,6 +274,7 @@ input:focus-visible {
 .statuszeile.ich {
   background: var(--gold-hell);
   outline: 2px solid var(--gold);
+  box-shadow: 0 var(--kante) 0 var(--gold-kante), var(--schatten);
 }
 
 .rliste {
@@ -304,12 +313,12 @@ input:focus-visible {
 .seite {
   grid-row: 1 / span 2;
   grid-column: 2;
-  background: var(--tafel);
-  border-left: 2px solid var(--linie);
+  background: var(--rahmen);
+  border-left: 3px solid var(--rahmen-tief);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 7px;
+  padding: 8px 10px 9px;
   min-height: 0;
 }
 .kopf {
@@ -320,12 +329,13 @@ input:focus-visible {
 .logo {
   font-family: var(--schrift-titel);
   font-size: 19px;
-  color: var(--akzent-dunkel);
+  color: var(--rahmen-text);
 }
 .raum {
   font-size: 12px;
   font-weight: 700;
-  background: var(--mulde);
+  background: var(--rahmen-hell);
+  color: var(--rahmen-text);
   border-radius: 6px;
   padding: 2px 7px;
   letter-spacing: 0.06em;
@@ -333,6 +343,12 @@ input:focus-visible {
 .kopf-knoepfe {
   margin-left: auto;
   display: flex;
+}
+.kopf .knopf.leise {
+  color: var(--rahmen-text);
+}
+.kopf .knopf.leise:hover:not(:disabled) {
+  background: var(--rahmen-hell);
 }
 
 .banner {
@@ -352,7 +368,7 @@ input:focus-visible {
 .timer {
   position: relative;
   height: 26px;
-  border-radius: 8px;
+  border-radius: var(--rund-s);
   background: var(--mulde);
   overflow: hidden;
   font-weight: 700;
@@ -378,12 +394,12 @@ input:focus-visible {
   animation: blink 1s steps(2) infinite;
 }
 .timer.pause {
-  background: var(--nacht);
-  color: var(--weiss);
+  background: var(--rahmen-tief);
+  color: var(--rahmen-text);
 }
 @keyframes blink {
   50% {
-    filter: brightness(1.15);
+    opacity: 0.78;
   }
 }
 
@@ -395,21 +411,29 @@ input:focus-visible {
 }
 .spielerzeile {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) 34px;
+  grid-template-columns: 10px minmax(0, 1fr) 34px;
   grid-template-rows: auto auto;
-  column-gap: 7px;
+  column-gap: 8px;
   align-items: center;
-  padding: 3px 7px;
-  border-radius: 9px;
+  padding: 3px 6px;
+  border-radius: var(--rund-m);
   border: 1.5px solid transparent;
-  background: var(--mulde);
+  background: var(--tafel);
 }
 .spielerzeile .punkt {
   grid-row: 1 / span 2;
 }
+.spielerzeile .punkt.gross {
+  width: 100%;
+  height: auto;
+  align-self: stretch;
+  min-height: 26px;
+  border-radius: 4px;
+}
 .spielerzeile.dran {
-  border-color: var(--gold);
-  background: var(--gold-blass);
+  border-color: var(--gold-kante);
+  background: var(--gold-hell);
+  box-shadow: 0 0 0 2px var(--gold);
 }
 .sname {
   white-space: nowrap;
@@ -432,14 +456,16 @@ input:focus-visible {
 .spunkte {
   grid-row: 1 / span 2;
   grid-column: 3;
-  font-family: var(--schrift-titel);
-  font-size: 22px;
-  font-weight: 700;
+  font-family: var(--schrift-zahl);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-size: 21px;
+  font-weight: 800;
   text-align: center;
   background: var(--weiss);
-  border-radius: 8px;
+  border-radius: var(--rund-s);
   border: 1.5px solid var(--linie);
-  line-height: 30px;
+  box-shadow: 0 2px 0 var(--linie-kante);
+  line-height: 28px;
 }
 
 .aktionen {
@@ -447,6 +473,9 @@ input:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  background: var(--tafel);
+  border-radius: var(--rund-m);
+  padding: 2px 6px 9px;
 }
 .wuerfelzeile {
   min-height: 50px;
@@ -461,7 +490,6 @@ input:focus-visible {
 }
 .wurf .wuerfel {
   animation: wurf 0.5s ease-out;
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25));
 }
 .wurf .wuerfel:nth-child(2) {
   animation-duration: 0.62s;
@@ -470,12 +498,35 @@ input:focus-visible {
   animation: none;
 }
 .wurfsumme {
-  font-family: var(--schrift-titel);
+  font-family: var(--schrift-zahl);
+  font-variant-numeric: lining-nums;
   font-size: 26px;
-  font-weight: 700;
+  font-weight: 800;
 }
 .wurfsumme.sieben {
   color: var(--warn);
+}
+.wuerfel-kante {
+  fill: var(--linie-kante);
+  stroke: var(--zahl);
+  stroke-width: 1.2;
+}
+.wuerfel-flaeche {
+  fill: var(--chip-1);
+  stroke: var(--zahl);
+  stroke-width: 1.2;
+}
+.wuerfel-auge {
+  fill: var(--zahl);
+}
+.wuerfel.rot .wuerfel-kante {
+  fill: var(--warn-text);
+}
+.wuerfel.rot .wuerfel-flaeche {
+  fill: var(--zahl-rot);
+}
+.wuerfel.rot .wuerfel-auge {
+  fill: var(--weiss);
 }
 @keyframes wurf {
   0% {
@@ -510,16 +561,16 @@ input:focus-visible {
 }
 .knopf.bau.gewaehlt {
   background: var(--gold-hell);
-  border-color: var(--gold);
-  box-shadow: 0 0 0 2px var(--gold);
+  border-color: var(--gold-kante);
+  box-shadow: 0 0 0 2px var(--gold), 0 var(--kante) 0 2px var(--gold-kante);
 }
 
 .log {
   flex: 1;
   min-height: 60px;
   overflow-y: auto;
-  background: var(--mulde);
-  border-radius: 9px;
+  background: var(--tafel);
+  border-radius: var(--rund-m);
   padding: 6px 9px;
   font-size: 12.5px;
   line-height: 1.35;
@@ -535,9 +586,9 @@ input:focus-visible {
 
 .handleiste {
   grid-column: 1;
-  background: var(--tafel);
-  border-top: 2px solid var(--linie);
-  padding: 7px 10px;
+  background: var(--rahmen);
+  border-top: 3px solid var(--rahmen-tief);
+  padding: 8px 10px 11px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -551,18 +602,20 @@ input:focus-visible {
   --kf: var(--tinte-leise);
   width: 66px;
   height: 80px;
-  border-radius: 10px;
-  background: linear-gradient(180deg, var(--weiss) 0%, var(--weiss) 55%, color-mix(in srgb, var(--kf) 28%, var(--weiss)) 100%);
+  border-radius: var(--rund-m);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--kf) 24%, var(--weiss)) 0 38px, var(--weiss) 38px);
   border: 2px solid var(--kf);
+  box-shadow: 0 var(--kante) 0 color-mix(in srgb, var(--kf) 60%, var(--umriss));
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 1px;
-  box-shadow: var(--schatten);
 }
 .karte b {
-  font-family: var(--schrift-titel);
+  font-family: var(--schrift-zahl);
+  font-variant-numeric: lining-nums;
+  font-weight: 800;
   font-size: 21px;
   line-height: 1;
 }
@@ -572,7 +625,7 @@ input:focus-visible {
   color: var(--tinte-leise);
 }
 .karte.leer {
-  opacity: 0.45;
+  opacity: 0.55;
   box-shadow: none;
 }
 .entw {
@@ -591,9 +644,10 @@ input:focus-visible {
   font-size: 13px;
   background: var(--entw-hell);
   border-color: var(--entw-linie);
+  box-shadow: 0 var(--kante) 0 var(--entw-kante);
 }
 .leerhinweis {
-  color: var(--tinte-leise);
+  color: var(--rahmen-leise);
 }
 .zugknoepfe {
   display: flex;
@@ -614,7 +668,7 @@ input:focus-visible {
 .modal-hg {
   position: fixed;
   inset: 0;
-  background: rgba(30, 20, 8, 0.5);
+  background: rgba(8, 30, 48, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -623,12 +677,12 @@ input:focus-visible {
 }
 .modal {
   background: var(--tafel);
-  border-radius: 16px;
+  border-radius: var(--rund-l);
   padding: 16px 20px;
   width: min(520px, 100%);
   max-height: 100%;
   overflow: auto;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--schatten-hoch);
   animation: auf 0.15s ease-out;
 }
 .modal.breit {
@@ -744,7 +798,7 @@ input:focus-visible {
 .hilfe h3 {
   font-size: 15px;
   margin: 10px 0 2px;
-  color: var(--akzent-dunkel);
+  color: var(--marine);
 }
 .hilfe p,
 .hilfe ol {
@@ -826,7 +880,7 @@ input:focus-visible {
 }
 .toast.dran {
   background: var(--gold);
-  color: var(--nacht);
+  color: var(--tinte);
   font-size: 20px;
   padding: 10px 24px;
 }
@@ -854,9 +908,9 @@ input:focus-visible {
   font-weight: 700;
   font-size: clamp(20px, 2.1vw, 40px);
   line-height: 1.15;
-  background: var(--gold-blass);
-  border: 2px solid var(--gold);
-  border-radius: 14px;
+  background: var(--gold-hell);
+  border: 2px solid var(--gold-kante);
+  border-radius: var(--rund-l);
   padding: 0.8vh 1vw;
   text-align: center;
 }
@@ -867,7 +921,10 @@ input:focus-visible {
 .beamer-wurf {
   display: flex;
   justify-content: center;
-  min-height: 100px;
+  align-items: center;
+  min-height: 112px;
+  background: var(--tafel);
+  border-radius: var(--rund-l);
 }
 .beamer .wurfsumme {
   font-size: clamp(34px, 3.6vw, 64px);
@@ -877,8 +934,8 @@ input:focus-visible {
   font-size: clamp(16px, 1.5vw, 28px);
 }
 .beamer .spielerzeile {
-  grid-template-columns: clamp(18px, 1.6vw, 30px) minmax(0, 1fr) clamp(40px, 4vw, 76px);
-  padding: 0.5vh 0.7vw;
+  grid-template-columns: clamp(10px, 0.9vw, 16px) minmax(0, 1fr) clamp(40px, 4vw, 76px);
+  padding: 0.5vh 0.6vw;
 }
 .beamer .angebot .punkt,
 .auswahl .punkt {
@@ -903,6 +960,7 @@ input:focus-visible {
 .beamer .spunkte {
   font-size: clamp(24px, 2.6vw, 48px);
   line-height: 1.35;
+  box-shadow: 0 3px 0 var(--linie-kante);
 }
 .beamer .marke {
   font-size: clamp(11px, 0.95vw, 18px);
@@ -917,7 +975,7 @@ input:focus-visible {
 .lobby {
   height: 100%;
   overflow: auto;
-  background: radial-gradient(ellipse at 50% 0%, var(--meer-1) 0%, var(--meer-2) 55%, var(--meer-3) 100%);
+  background: var(--wellen), radial-gradient(ellipse at 50% 0%, var(--meer-1) 0%, var(--meer-2) 55%, var(--meer-3) 100%);
   padding: 24px 16px;
 }
 .start-karte {
@@ -926,7 +984,7 @@ input:focus-visible {
   background: var(--tafel);
   border-radius: 20px;
   padding: 26px 30px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 0 var(--linie-kante), var(--schatten-hoch);
 }
 .start-karte.schmal {
   max-width: 480px;
@@ -942,7 +1000,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--akzent-dunkel);
+  color: var(--marine);
 }
 .unter {
   margin: 4px 0 18px;
@@ -1002,7 +1060,7 @@ input.code {
 }
 .wahl {
   background: var(--mulde);
-  border-radius: 14px;
+  border-radius: var(--rund-l);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -1037,7 +1095,7 @@ summary {
   height: 42px;
   border-radius: 50%;
   border: 5px solid var(--linie);
-  border-top-color: var(--akzent);
+  border-top-color: var(--gold-kante);
   margin: 18px auto;
   animation: dreh 0.9s linear infinite;
 }
@@ -1063,7 +1121,7 @@ summary {
   display: flex;
   gap: 26px;
   align-items: center;
-  box-shadow: var(--schatten);
+  box-shadow: 0 4px 0 var(--linie-kante), var(--schatten);
 }
 .raumcode {
   font-family: ui-monospace, 'SF Mono', Consolas, monospace;
@@ -1071,7 +1129,7 @@ summary {
   font-weight: 800;
   letter-spacing: 0.14em;
   line-height: 1;
-  color: var(--akzent-dunkel);
+  color: var(--marine);
 }
 .lobby-link p {
   margin: 0 0 8px;
@@ -1090,14 +1148,14 @@ summary {
   background: var(--tafel);
   border-radius: 18px;
   padding: 16px 20px;
-  box-shadow: var(--schatten);
+  box-shadow: 0 4px 0 var(--linie-kante), var(--schatten);
 }
 .tafel h2 {
   font-size: 20px;
   margin-bottom: 8px;
 }
 .tafel h2 small {
-  font-family: ui-rounded, system-ui, sans-serif;
+  font-family: var(--schrift);
   font-size: 12px;
   font-weight: 600;
   color: var(--tinte-leise);
@@ -1171,9 +1229,9 @@ summary {
 }
 .angebot {
   background: var(--tafel);
-  border-radius: 14px;
+  border-radius: var(--rund-l);
   padding: 10px 14px;
-  box-shadow: var(--schatten);
+  box-shadow: 0 var(--kante) 0 var(--linie-kante), var(--schatten);
   font-size: 14px;
   border: 2px solid var(--linie);
 }
@@ -1286,9 +1344,9 @@ summary {
 
 .bank {
   flex: none;
-  background: var(--mulde);
-  border-radius: 10px;
-  padding: 5px 7px 6px;
+  background: var(--tafel);
+  border-radius: var(--rund-m);
+  padding: 5px 7px 8px;
 }
 .bank-kopf {
   display: flex;
@@ -1315,7 +1373,8 @@ summary {
 .bank-stapel {
   background: var(--weiss);
   border: 1.5px solid var(--linie);
-  border-radius: 8px;
+  border-radius: var(--rund-s);
+  box-shadow: 0 2px 0 var(--linie-kante);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1323,8 +1382,10 @@ summary {
   line-height: 1.1;
 }
 .bank-stapel b {
-  font-family: var(--schrift-titel);
-  font-size: 17px;
+  font-family: var(--schrift-zahl);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-weight: 800;
+  font-size: 16px;
 }
 .bank-stapel small {
   font-size: 11px;
@@ -1366,11 +1427,11 @@ summary {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  background: rgba(16, 38, 56, 0.42);
+  background: rgba(8, 30, 48, 0.46);
   transition: background 0.4s;
 }
 .wuerfelbuehne.fliegt {
-  background: rgba(16, 38, 56, 0);
+  background: rgba(8, 30, 48, 0);
   pointer-events: none;
 }
 .buehne-inhalt {
@@ -1386,9 +1447,6 @@ summary {
 }
 .buehne-wuerfel:disabled {
   cursor: default;
-}
-.buehne-wuerfel .wuerfel {
-  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.4));
 }
 .wuerfelbuehne.wartet .buehne-wuerfel .wuerfel {
   animation: wackeln 2.2s ease-in-out infinite;
@@ -1441,9 +1499,10 @@ summary {
   }
 }
 .buehne-summe {
-  font-family: var(--schrift-titel);
+  font-family: var(--schrift-zahl);
+  font-variant-numeric: lining-nums;
   font-size: 64px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--weiss);
   text-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
   line-height: 1;
@@ -1470,7 +1529,7 @@ summary {
 }
 .wuerfel-hinweis {
   font-weight: 700;
-  color: var(--akzent-dunkel);
+  color: var(--marine);
 }
 
 /* ---------- Kartenflug ---------- */
@@ -1492,7 +1551,7 @@ summary {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--kf) 60%, var(--umriss)), 0 5px 12px rgba(8, 30, 48, 0.35);
 }
 .flugkarte.verdeckt {
   background: var(--mulde);
@@ -1520,14 +1579,14 @@ summary {
   font-size: 13px;
   font-weight: 700;
   border: none;
-  background: var(--linie);
-  color: var(--tinte-leise);
+  background: var(--rahmen-hell);
+  color: var(--rahmen-leise);
   border-radius: 8px 8px 0 0;
   padding: 4px 12px;
   cursor: pointer;
 }
 .reiter-knopf.an {
-  background: var(--mulde);
+  background: var(--tafel);
   color: var(--tinte);
 }
 .verlauf-chat .log {
@@ -1550,8 +1609,8 @@ summary {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--mulde);
-  border-radius: 0 9px 9px 9px;
+  background: var(--tafel);
+  border-radius: 0 var(--rund-m) var(--rund-m) var(--rund-m);
   padding: 6px 8px;
   gap: 6px;
 }
@@ -1590,7 +1649,8 @@ summary {
 }
 .lobby-chat .chat {
   height: 220px;
-  border-radius: 10px;
+  border-radius: var(--rund-m);
+  background: var(--mulde);
 }
 
 /* ---------- Beamer: neue Teile größer ---------- */

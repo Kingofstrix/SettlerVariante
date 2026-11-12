@@ -128,11 +128,13 @@ const AUGEN: Record<number, [number, number][]> = {
 };
 
 export function Wuerfel({ wert, groesse = 44, rot = false }: { wert: number; groesse?: number; rot?: boolean }): JSX.Element {
+  // Wie die Felder: helle Oberseite auf dunkler Unterkante (ersetzt den früheren Schlagschatten-Filter).
   return (
-    <svg class="wuerfel" viewBox="0 0 24 24" width={groesse} height={groesse} role="img" aria-label={`Würfel ${wert}`}>
-      <rect x="1.5" y="1.5" width="21" height="21" rx="4.5" fill={rot ? '#c8372d' : '#fffaf0'} stroke="#3a2c1c" stroke-width="1.2" />
+    <svg class={`wuerfel ${rot ? 'rot' : ''}`} viewBox="0 0 24 24" width={groesse} height={groesse} role="img" aria-label={`Würfel ${wert}`}>
+      <rect x="1.5" y="3" width="21" height="20" rx="4.5" class="wuerfel-kante" />
+      <rect x="1.5" y="1" width="21" height="20" rx="4.5" class="wuerfel-flaeche" />
       {(AUGEN[wert] ?? []).map(([x, y]) => (
-        <circle cx={x} cy={y} r="2.1" fill={rot ? '#fff' : '#3a2c1c'} />
+        <circle cx={x} cy={y - 1} r="2.1" class="wuerfel-auge" />
       ))}
     </svg>
   );
