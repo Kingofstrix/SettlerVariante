@@ -1,0 +1,317 @@
+/* Das Spielbrett: zwei gestapelte SVGs (siehe Brett.tsx). Alle Farben kommen aus tokens.css. */
+
+.brett-stapel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.brett {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 44px 6px 6px;
+}
+/* Eigener Layer: Die Grundebene wird einmal gerastert. Hover, Bauplätze und neue Spielsteine
+   zeichnen danach nur noch die dünn besetzte Spielebene neu. */
+.brett-grund {
+  will-change: transform;
+}
+
+/* ---------- Insel: fünfmal dieselbe Form, nach unten versetzt ---------- */
+
+.insel {
+  stroke-linejoin: round;
+  stroke-width: 26;
+}
+.insel.saum {
+  fill: var(--flachwasser);
+  stroke: var(--flachwasser);
+}
+.insel.saum.weit {
+  stroke-width: 124;
+  opacity: 0.1;
+}
+.insel.saum.nah {
+  stroke-width: 70;
+  opacity: 0.2;
+}
+.insel.schlag {
+  fill: var(--tiefe);
+  stroke: var(--tiefe);
+  stroke-width: 36;
+  opacity: 0.22;
+}
+.insel.sockel-tief {
+  fill: var(--sand-tief);
+  stroke: var(--sand-tief);
+}
+.insel.sockel {
+  fill: var(--sand-kante);
+  stroke: var(--sand-kante);
+}
+.insel.strand {
+  fill: var(--sand);
+  stroke: var(--sand);
+}
+
+/* ---------- Felder ---------- */
+
+.g-wald {
+  --k: var(--g-wald-k);
+}
+.g-huegel {
+  --k: var(--g-huegel-k);
+}
+.g-weide {
+  --k: var(--g-weide-k);
+}
+.g-acker {
+  --k: var(--g-acker-k);
+}
+.g-gebirge {
+  --k: var(--g-gebirge-k);
+}
+.g-wueste {
+  --k: var(--g-wueste-k);
+}
+.feld-kante,
+.feld-oben {
+  stroke-width: 7;
+  stroke-linejoin: round;
+}
+.feld-kante {
+  fill: var(--k);
+  stroke: var(--k);
+}
+.feld-licht {
+  fill: none;
+  stroke: var(--weiss);
+  stroke-opacity: 0.3;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+/* ---------- Zahlenchips ---------- */
+
+.chip-kante {
+  fill: var(--chip-kante);
+}
+.chip-flaeche {
+  stroke: var(--chip-rand);
+  stroke-width: 2.2;
+}
+.zahl {
+  font-family: var(--schrift-zahl);
+  font-variant-numeric: lining-nums;
+  font-weight: 800;
+  fill: var(--zahl);
+}
+.chip-punkt {
+  fill: var(--zahl);
+}
+.chip.rot .zahl,
+.chip.rot .chip-punkt {
+  fill: var(--zahl-rot);
+}
+
+/* ---------- Häfen ---------- */
+
+.steg {
+  fill: none;
+  stroke: var(--holzsteg-tief);
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.steg-planken {
+  fill: none;
+  stroke: var(--holzsteg-hell);
+  stroke-width: 7;
+  stroke-dasharray: 4 5;
+}
+.plakette-kante {
+  fill: var(--holzsteg-tief);
+}
+.plakette {
+  fill: var(--chip-1);
+  stroke: var(--holzsteg);
+  stroke-width: 4;
+}
+.hafen-text {
+  font-family: var(--schrift-zahl);
+  font-variant-numeric: lining-nums;
+  font-weight: 800;
+  font-size: 26px;
+  fill: var(--zahl);
+}
+.hafen-text.klein {
+  font-size: 19px;
+}
+
+/* ---------- Ertrag und Räuberfeld ---------- */
+
+.ertrag,
+.gesperrt {
+  pointer-events: none;
+}
+.ertrag {
+  animation: ertrag-auf 0.45s ease-out;
+}
+.ertrag-licht {
+  fill: var(--weiss);
+  fill-opacity: 0.1;
+  stroke: var(--gold);
+  stroke-width: 7;
+  stroke-linejoin: round;
+}
+.ertrag-ring {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 6;
+}
+.gesperrt {
+  fill: var(--raeuber);
+  opacity: 0.22;
+}
+@keyframes ertrag-auf {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------- Spielsteine ---------- */
+
+.gebaeude,
+.strasse,
+.raeuber {
+  pointer-events: none;
+}
+.str-schatten {
+  stroke: var(--tiefe);
+  stroke-opacity: 0.34;
+  stroke-width: 19;
+}
+.str-rand {
+  stroke: var(--umriss);
+  stroke-width: 19;
+}
+.str-farbe {
+  stroke: currentColor;
+  stroke-width: 12;
+}
+.str-glanz {
+  stroke: var(--weiss);
+  stroke-opacity: 0.4;
+  stroke-width: 3.2;
+}
+.fig-schatten {
+  fill: var(--tiefe);
+  opacity: 0.32;
+}
+.fig-koerper {
+  fill: currentColor;
+}
+.fig-dunkel {
+  fill: var(--umriss);
+  opacity: 0.24;
+}
+.fig-hell {
+  fill: var(--weiss);
+  opacity: 0.32;
+}
+.fig-tuer {
+  fill: var(--umriss);
+  opacity: 0.5;
+}
+.fig-umriss {
+  fill: none;
+  stroke: var(--umriss);
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+.raeuber-form {
+  stroke: var(--weiss);
+  stroke-width: 3;
+}
+.raeuber-glanz {
+  fill: none;
+  stroke: var(--weiss);
+  stroke-opacity: 0.6;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+/* ---------- Klickbare Bauplätze ---------- */
+
+.ziel {
+  cursor: pointer;
+}
+.ziel-kante line {
+  stroke-linecap: round;
+}
+/* Dunkler Grund unter hellen Strichen: auf Sand, Wiese und Fels gleich gut zu sehen */
+.kante-grund {
+  stroke: var(--tiefe);
+  stroke-opacity: 0.5;
+  stroke-width: 20;
+}
+.kante-strich {
+  stroke: var(--weiss);
+  stroke-width: 10;
+  stroke-dasharray: 7 12;
+}
+.ziel-kante:hover .kante-grund {
+  stroke: var(--umriss);
+  stroke-opacity: 1;
+  stroke-width: 19;
+}
+.ziel-kante:hover .kante-strich {
+  stroke: var(--ich);
+  stroke-dasharray: none;
+  stroke-width: 12;
+}
+.ziel-ecke .ring {
+  fill: rgba(255, 255, 255, 0.45);
+  stroke: var(--weiss);
+  stroke-width: 4.5;
+  stroke-dasharray: 7 6;
+  /* Drei Pulse beim Erscheinen, danach ruht der Ring: kein Dauer-Repaint des Bretts. */
+  animation: puls 1.4s ease-in-out 3;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ziel-ecke .vorschau {
+  fill: var(--ich);
+  stroke: var(--umriss);
+  stroke-width: 5;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.ziel-ecke:hover .vorschau {
+  opacity: 0.95;
+}
+.ziel-ecke:hover .ring {
+  fill: transparent;
+  animation: none;
+}
+.ziel-hex {
+  fill: rgba(255, 255, 255, 0.14);
+  stroke: var(--weiss);
+  stroke-width: 5;
+  stroke-dasharray: 10 9;
+}
+.ziel-hex:hover {
+  fill: rgba(42, 39, 49, 0.45);
+  stroke-dasharray: none;
+}
+@keyframes puls {
+  50% {
+    transform: scale(1.22);
+  }
+}
+
+/* Beamer: kein Platz für die Statuszeile über dem Brett nötig */
+.beamer .brett {
+  padding: 6px;
+}

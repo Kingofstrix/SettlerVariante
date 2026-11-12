@@ -17,7 +17,7 @@ import {
   type Sicht,
 } from '../engine';
 import { LokalSitzung } from '../netz/lokal';
-import { farbHex, type Absicht, type Sitzung, type SitzungsZustand } from '../netz/sitzung';
+import { farbHex, type Absicht, type Sitzung, type SitzungsZustand, type TimerAnzeige } from '../netz/sitzung';
 import { DEV } from '../netz/speicher';
 import { Brett, KEINE_ZIELE, type Ziele } from './Brett';
 import { AbwerfenDialog, ErfindungDialog, HandelDialog, HilfeDialog, Modal, MonopolDialog, RohstoffListe, StehlenDialog } from './Dialoge';
@@ -109,7 +109,6 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
   const [dialog, setDialog] = useState<null | 'handel' | 'erfindung' | 'monopol' | 'hilfe' | 'menue'>(null);
   const [gegen, setGegen] = useState<Handelsangebot | undefined>(undefined);
   const [, neu] = useState(0);
-  const rest = useRestzeit(z.timer);
   useEreignisse(z, sicht);
   const { anim: wuerfelAnim, starte: wuerfelStart, zentral: wurfZentral } = useWuerfelAnimation(sicht, z.hinweis?.nr);
   const rad = useGluecksrad(sicht, false, z.hinweis?.nr);
@@ -370,19 +369,7 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
         </div>
       </footer>
 
-      {sicht.phase === 'abwerfen' && sicht.abwerfen[ich] !== undefined && (
-        <AbwerfenDialog
-          sicht={sicht}
-          aktion={aktion}
-          rest={z.timer?.art === 'abwerfen' ? rest : null}
-          onDrehen={() => {
-            if (z.pausiert) return;
-            rad.starte();
-            aktion({ typ: 'GLUECKSRAD_DREHEN' });
-          }}
-        />
-      )}
-      {rad.anzeige && <GluecksradBuehne key={rad.anzeige.id} anzeige={rad.anzeige} onFertig={rad.fertig} eilig={rad.wartend > 0} />}
+      {sicht.phase === 'abwerfen' && sicht.abwerfen[ich] !== undefined && <AbwerfenMitRestzeit sicht={sicht} aktion={aktion} timer={z.timer} />}
       {sicht.phase === 'stehlen' && binAktiv && <StehlenDialog sicht={sicht} aktion={aktion} />}
       {dialog === 'handel' && sicht.phase === 'aktion' && <HandelDialog sicht={sicht} vorlage={gegen} aktion={aktion} onZu={() => setDialog(null)} />}
       {dialog === 'erfindung' && <ErfindungDialog sicht={sicht} aktion={aktion} onZu={() => setDialog(null)} />}
@@ -392,6 +379,12 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
       {sicht.phase === 'ende' && <EndeDialog sitzung={sitzung} sicht={sicht} onVerlassen={onVerlassen} />}
     </div>
   );
+}
+
+/** Hält den Sekundentakt der Restzeit aus der Spielansicht heraus: Nur dieser Dialog rendert viermal je Sekunde neu. */
+function AbwerfenMitRestzeit({ sicht, aktion, timer }: { sicht: Sicht; aktion: (a: Absicht) => void; timer: TimerAnzeige | null }): JSX.Element {
+  const rest = useRestzeit(timer?.art === 'abwerfen' ? timer : null);
+  return <AbwerfenDialog sicht={sicht} aktion={aktion} rest={rest} />;
 }
 
 export function EndeDialog({ sitzung, sicht, onVerlassen }: { sitzung: Sitzung; sicht: Sicht; onVerlassen: () => void }): JSX.Element {

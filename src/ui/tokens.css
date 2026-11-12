@@ -1,0 +1,110 @@
+/* Design-Tokens: die einzige Stelle für Farben, Schatten, Radien und Schrift.
+   Leitmotiv: Alles ist eine Kachel mit heller Oberseite und dunkler Unterkante –
+   Hexfelder, Zahlenchips, Karten und Knöpfe. */
+
+:root {
+  /* ---------- Gelände: -1 Oberseite hell, -2 Oberseite satt, -k Unterkante ---------- */
+  --g-wald-1: #4ba768;
+  --g-wald-2: #2f7d4f;
+  --g-wald-k: #1d5936;
+  --g-huegel-1: #e0865a;
+  --g-huegel-2: #c45a31;
+  --g-huegel-k: #8d3a1c;
+  --g-weide-1: #c0e67e;
+  --g-weide-2: #94ca56;
+  --g-weide-k: #6b9d39;
+  --g-acker-1: #f9dc68;
+  --g-acker-2: #eabb34;
+  --g-acker-k: #b88916;
+  --g-gebirge-1: #afb5c6;
+  --g-gebirge-2: #858ba2;
+  --g-gebirge-k: #5c6277;
+  --g-wueste-1: #f1e1b1;
+  --g-wueste-2: #e0ca90;
+  --g-wueste-k: #b89f65;
+
+  /* ---------- Rohstoffe (Karten, Bank, Chips) ---------- */
+  --r-holz: #2f7d4f;
+  --r-lehm: #c2552d;
+  --r-wolle: #8cc152;
+  --r-getreide: #e8b730;
+  --r-erz: #7b8194;
+
+  /* ---------- Insel und Meer ---------- */
+  --sand: #f2e3b8;
+  --sand-kante: #cfb47c;
+  --sand-tief: #a88b56;
+  --meer-1: #62b7dd;
+  --meer-2: #2f86b8;
+  --meer-3: #1e6390;
+  --flachwasser: #8fdcf0;
+  --tiefe: #0b2c44;
+  /* Feine Wellenlinien als Kachel; liegt über dem Meeresverlauf */
+  --wellen: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='90'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.075' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M8 24q14-9 28 0t28 0'/%3E%3Cpath d='M98 69q14-9 28 0t28 0'/%3E%3C/g%3E%3C/svg%3E");
+
+  /* ---------- Spielsteine ---------- */
+  --umriss: #1d1a16;
+  --chip-1: #fffdf6;
+  --chip-2: #f4e7c9;
+  --chip-kante: #b39c6c;
+  --chip-rand: #5a4630;
+  --zahl: #33271a;
+  --zahl-rot: #c8372d;
+  --holzsteg: #7a5230;
+  --holzsteg-hell: #b98a5a;
+  --holzsteg-tief: #55371f;
+  --raeuber: #2a2731;
+
+  /* ---------- Oberfläche ---------- */
+  --rahmen: #163a56; /* Seitenleiste und Handleiste: tiefes Meerblau */
+  --rahmen-hell: #21506f;
+  --rahmen-tief: #0e2a40;
+  --rahmen-text: #f2e3b8;
+  --rahmen-leise: #9fc0d6;
+  --papier: #f4ecdc;
+  --tafel: #fcf8ee;
+  --mulde: #f3ead6; /* eingelassene Flächen: Verlauf, Chat, Listenzeilen */
+  --weiss: #ffffff;
+  --tinte: #2b2218;
+  --tinte-leise: #74654f;
+  --linie: #dfd2b6;
+  --linie-kante: #c9b991; /* Unterkante heller Kacheln */
+
+  /* ---------- Signalfarben ---------- */
+  --gold: #f2b632; /* „du bist dran“, Hauptaktion, Auswahl */
+  --gold-hell: #ffeab0;
+  --gold-blass: #fff5d3;
+  --gold-kante: #bd8a12;
+  --gold-licht: #f8c957;
+  --marine: #173f5e; /* Überschriften auf hellem Grund */
+  --ok: #2c8a4b;
+  --ok-hell: #e4f3e3;
+  --ok-text: #1e5e33;
+  --warn: #c0392b;
+  --warn-hell: #fbe6e1;
+  --warn-text: #8e2416;
+  --warn-linie: #e3a297;
+  --warn-licht: #ffd0c8;
+  --hinweis: #b9770e;
+  --info-hell: #e8f1f8;
+  --info-linie: #9cc3de;
+  --entw: #6b4fb3;
+  --entw-hell: #f1eafd;
+  --entw-linie: #cbbbe9;
+  --entw-kante: #a691d8;
+  --nacht: #2b2218; /* Tooltips, Toasts */
+
+  /* ---------- Form ---------- */
+  --rund-s: 8px;
+  --rund-m: 11px;
+  --rund-l: 16px;
+  --kante: 3px; /* Höhe der Unterkante */
+  --schatten: 0 2px 8px rgba(8, 30, 48, 0.18);
+  --schatten-hoch: 0 12px 36px rgba(8, 30, 48, 0.38);
+
+  /* ---------- Schrift ---------- */
+  --schrift: ui-rounded, 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --schrift-titel: Georgia, 'Times New Roman', serif;
+  /* Zahlen stehen in der fetten Grundschrift: Versalziffern liest man vom Beamer besser als Georgias Mediävalziffern. */
+  --schrift-zahl: var(--schrift);
+}
