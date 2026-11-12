@@ -246,95 +246,6 @@ input:focus-visible {
   overflow: hidden;
 }
 
-.brett {
-  width: 100%;
-  height: 100%;
-  padding: 44px 6px 6px;
-}
-.zahl {
-  font-family: var(--schrift-titel);
-  font-weight: 700;
-  fill: var(--zahl);
-}
-.zahl.rot {
-  fill: var(--zahl-rot);
-}
-.hafen-text {
-  font-weight: 800;
-  font-size: 26px;
-  fill: var(--zahl);
-}
-.hafen-text.klein {
-  font-size: 19px;
-}
-.hex.ertrag polygon {
-  filter: brightness(1.14) saturate(1.1);
-}
-.gebaeude,
-.strasse,
-.raeuber {
-  pointer-events: none;
-}
-.raeuber {
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
-}
-
-.ziel {
-  cursor: pointer;
-}
-.ziel-kante {
-  stroke: var(--weiss);
-  stroke-opacity: 0.55;
-  stroke-width: 15;
-  stroke-linecap: round;
-  stroke-dasharray: 3 11;
-}
-.ziel-kante:hover {
-  stroke: var(--ich);
-  stroke-opacity: 1;
-  stroke-dasharray: none;
-  stroke-width: 14;
-  filter: drop-shadow(0 0 3px var(--umriss));
-}
-.ziel-ecke .ring {
-  fill: rgba(255, 255, 255, 0.35);
-  stroke: var(--weiss);
-  stroke-width: 4;
-  stroke-dasharray: 7 6;
-  animation: puls 1.4s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-.ziel-ecke .vorschau {
-  fill: var(--ich);
-  stroke: var(--umriss);
-  stroke-width: 5;
-  stroke-linejoin: round;
-  opacity: 0;
-}
-.ziel-ecke:hover .vorschau {
-  opacity: 0.95;
-}
-.ziel-ecke:hover .ring {
-  fill: transparent;
-  animation: none;
-}
-.ziel-hex {
-  fill: rgba(255, 255, 255, 0.12);
-  stroke: var(--weiss);
-  stroke-width: 5;
-  stroke-dasharray: 10 9;
-}
-.ziel-hex:hover {
-  fill: rgba(42, 39, 49, 0.45);
-  stroke-dasharray: none;
-}
-@keyframes puls {
-  50% {
-    transform: scale(1.22);
-  }
-}
-
 .statuszeile {
   position: absolute;
   top: 8px;
@@ -931,9 +842,6 @@ input:focus-visible {
   grid-row: 1;
   padding: 1.2vh 1vw;
   gap: 1.2vh;
-}
-.beamer .brett {
-  padding: 6px;
 }
 .beamer .logo {
   font-size: clamp(20px, 2vw, 34px);

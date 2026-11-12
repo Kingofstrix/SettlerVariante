@@ -1,6 +1,6 @@
 // Eigene SVG-Symbole (24×24). Rohstoffe sind zusätzlich zur Farbe an der Form erkennbar.
 import type { JSX } from 'preact';
-import type { EntwTyp, Gelaende, Rohstoff } from '../engine';
+import type { EntwTyp, Rohstoff } from '../engine';
 
 /** Kartenfarbe je Rohstoff; die Werte stehen in tokens.css. */
 export const ROHSTOFF_FARBE: Record<Rohstoff, string> = {
@@ -9,15 +9,6 @@ export const ROHSTOFF_FARBE: Record<Rohstoff, string> = {
   wolle: 'var(--r-wolle)',
   getreide: 'var(--r-getreide)',
   erz: 'var(--r-erz)',
-};
-
-export const GELAENDE_FARBE: Record<Gelaende, string> = {
-  wald: '#2f7d4f',
-  huegel: '#c8643c',
-  weide: '#9bcf62',
-  acker: '#efc648',
-  gebirge: '#8b90a3',
-  wueste: '#e3cf9c',
 };
 
 export function rohstoffForm(typ: Rohstoff): JSX.Element {
