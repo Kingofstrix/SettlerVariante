@@ -56,6 +56,7 @@ export function zufallsAktion(s: GameState, rng: RngTraeger): Aktion | null {
     }
     case 'abwerfen': {
       const sp = waehle(rng, dran);
+      if (s.config.gluecksrad && !s.gedreht.includes(sp) && zufall(rng) < 0.5) return { typ: 'GLUECKSRAD_DREHEN', spieler: sp };
       const hand = { ...s.spieler[sp].hand };
       const karten = leereRohstoffe();
       for (let i = 0; i < s.abwerfen[sp]; i++) {

@@ -1,6 +1,7 @@
 // Host: einzige Instanz, die Aktionen anwendet. Verwaltet Sitze, Verbindungen, Timer und Persistenz.
 import {
   ROHSTOFFE,
+  STANDARD_CONFIG,
   amZug,
   anwenden,
   neuesSpiel,
@@ -51,7 +52,17 @@ export function pruefeHostDaten(d: unknown): HostDaten | null {
   if (x.spiel !== null && (typeof x.spiel !== 'object' || !Array.isArray(x.spiel.spieler) || !x.spiel.brett)) return null;
   if (!x.sitze.every((s) => s && typeof s.token === 'string' && typeof s.name === 'string' && typeof s.farbe === 'string')) return null;
   // Ältere Spielstände ohne Bewegungsliste ergänzen
-  const spiel = x.spiel ? { ...x.spiel, bewegungen: x.spiel.bewegungen ?? [], bewegungNr: x.spiel.bewegungNr ?? 0 } : null;
+  const spiel = x.spiel
+    ? {
+        ...x.spiel,
+        config: { ...STANDARD_CONFIG, ...x.spiel.config },
+        bewegungen: x.spiel.bewegungen ?? [],
+        bewegungNr: x.spiel.bewegungNr ?? 0,
+        gluecksrad: x.spiel.gluecksrad ?? [],
+        gluecksradNr: x.spiel.gluecksradNr ?? 0,
+        gedreht: x.spiel.gedreht ?? [],
+      }
+    : null;
   return {
     v: 1,
     raumCode: x.raumCode,
@@ -100,7 +111,8 @@ const CHAT_PRO_10S = 5;
 /** Schlüssel des aktuellen Zeitabschnitts: Wechselt er, beginnt ein neuer Timer. */
 function schritt(s: GameState): [string, TimerArt] {
   if (s.phase === 'setup') return [`s:${s.setup.schritt}:${s.setup.erwartet}`, 'zug'];
-  if (s.phase === 'abwerfen') return [`a:${s.zugNr}`, 'abwerfen'];
+  // Nach einem Dreh am Glücksrad beginnt die Abwurfzeit neu (die Animation soll keine Zeit kosten).
+  if (s.phase === 'abwerfen') return [`a:${s.zugNr}:${s.gedreht.length}`, 'abwerfen'];
   if (s.phase === 'sonderbau') return [`b:${s.zugNr}:${s.sonderbau!.index}`, 'sonderbau'];
   return [`z:${s.zugNr}`, 'zug'];
 }
@@ -521,6 +533,7 @@ export class Host extends Beobachtbar implements Sitzung {
         layout: d.einstellungen.layout,
         siegpunkte: d.einstellungen.siegpunkte,
         freundlicherRaeuber: d.einstellungen.freundlicherRaeuber,
+        gluecksrad: d.einstellungen.gluecksrad,
       },
     });
     // Die Engine mischt die Sitzreihenfolge; Namen sind in der Lobby eindeutig.

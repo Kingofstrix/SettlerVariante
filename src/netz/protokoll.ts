@@ -3,7 +3,7 @@
 import type { Brett, Sicht } from '../engine';
 import { CHAT_MAX_LAENGE, type Absicht, type ChatEintrag, type Einstellungen, type SitzInfo, type TimerArt } from './sitzung';
 
-export const PROTOKOLL_VERSION = 2; // 2: Chat, Kartenbewegungen
+export const PROTOKOLL_VERSION = 3; // 2: Chat, Kartenbewegungen; 3: Glücksrad
 
 // ---- Client -> Host ----
 export type ClientNachricht =
@@ -34,7 +34,7 @@ export type HostNachricht =
   | { v: number; t: 'ende'; grund: EndeGrund };
 
 const ABSICHT_TYPEN = new Set([
-  'WUERFELN', 'ABWERFEN', 'RAEUBER_SETZEN', 'STEHLEN', 'STRASSE_BAUEN', 'SIEDLUNG_BAUEN', 'STADT_BAUEN',
+  'WUERFELN', 'ABWERFEN', 'GLUECKSRAD_DREHEN', 'RAEUBER_SETZEN', 'STEHLEN', 'STRASSE_BAUEN', 'SIEDLUNG_BAUEN', 'STADT_BAUEN',
   'ENTW_KAUFEN', 'RITTER_SPIELEN', 'STRASSENBAU_SPIELEN', 'ERFINDUNG_SPIELEN', 'MONOPOL_SPIELEN', 'BANKHANDEL',
   'HANDEL_ANBIETEN', 'HANDEL_ANNEHMEN', 'HANDEL_ABLEHNEN', 'HANDEL_ZURUECKZIEHEN', 'ZUG_BEENDEN', 'SONDERBAU_FERTIG',
 ]);

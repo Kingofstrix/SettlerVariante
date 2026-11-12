@@ -22,6 +22,8 @@ export interface Einstellungen {
   layout: Layout;
   siegpunkte: number; // 8, 10, 12
   freundlicherRaeuber: boolean;
+  /** Las Vegas: Glücksrad statt Abwerfen bei einer 7 */
+  gluecksrad: boolean;
   zugZeit: number; // Sekunden; 0 = aus
   sonderbauZeit: number;
   abwerfZeit: number;
@@ -32,6 +34,7 @@ export const STANDARD_EINSTELLUNGEN: Einstellungen = {
   layout: 'zufall',
   siegpunkte: 10,
   freundlicherRaeuber: false,
+  gluecksrad: true,
   zugZeit: 90,
   sonderbauZeit: 20,
   abwerfZeit: 30,

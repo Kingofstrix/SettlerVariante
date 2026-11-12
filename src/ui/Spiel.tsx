@@ -25,6 +25,7 @@ import { EntwIcon, ROHSTOFF_FARBE, RohstoffIcon } from './Icons';
 import { useKartenFluege } from './animation';
 import { ChatEingabe, ChatVerlauf } from './Chat';
 import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WurfAnzeige, statusText } from './Teile';
+import { GluecksradBuehne, useGluecksrad } from './Gluecksrad';
 import { WuerfelBuehne, useWuerfelAnimation } from './WuerfelBuehne';
 import { toast, useRestzeit, useSitzung } from './hooks';
 import { setzeTon, ton, tonAn } from './ton';
@@ -111,6 +112,7 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
   const rest = useRestzeit(z.timer);
   useEreignisse(z, sicht);
   const { anim: wuerfelAnim, starte: wuerfelStart, zentral: wurfZentral } = useWuerfelAnimation(sicht, z.hinweis?.nr);
+  const rad = useGluecksrad(sicht, false, z.hinweis?.nr);
   useKartenFluege(sicht);
 
   const binAktiv = sicht.aktiv === ich;
@@ -368,7 +370,19 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
         </div>
       </footer>
 
-      {sicht.phase === 'abwerfen' && sicht.abwerfen[ich] !== undefined && <AbwerfenDialog sicht={sicht} aktion={aktion} rest={z.timer?.art === 'abwerfen' ? rest : null} />}
+      {sicht.phase === 'abwerfen' && sicht.abwerfen[ich] !== undefined && (
+        <AbwerfenDialog
+          sicht={sicht}
+          aktion={aktion}
+          rest={z.timer?.art === 'abwerfen' ? rest : null}
+          onDrehen={() => {
+            if (z.pausiert) return;
+            rad.starte();
+            aktion({ typ: 'GLUECKSRAD_DREHEN' });
+          }}
+        />
+      )}
+      {rad.anzeige && <GluecksradBuehne key={rad.anzeige.id} anzeige={rad.anzeige} onFertig={rad.fertig} eilig={rad.wartend > 0} />}
       {sicht.phase === 'stehlen' && binAktiv && <StehlenDialog sicht={sicht} aktion={aktion} />}
       {dialog === 'handel' && sicht.phase === 'aktion' && <HandelDialog sicht={sicht} vorlage={gegen} aktion={aktion} onZu={() => setDialog(null)} />}
       {dialog === 'erfindung' && <ErfindungDialog sicht={sicht} aktion={aktion} onZu={() => setDialog(null)} />}

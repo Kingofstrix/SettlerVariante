@@ -158,6 +158,8 @@ export function Lobby({ sitzung, onVerlassen }: { sitzung: Sitzung; onVerlassen:
             <Auswahl wert={e.siegpunkte} aus={!h} onChange={(w) => setze({ siegpunkte: w })} optionen={[[8, '8 (kurz)'], [10, '10'], [12, '12']]} />
             <label data-tip="Spieler mit höchstens 2 Siegpunkten werden vom Räuber verschont.">Freundlicher Räuber</label>
             <Auswahl wert={e.freundlicherRaeuber} aus={!h} onChange={(w) => setze({ freundlicherRaeuber: w })} optionen={[[false, 'Aus'], [true, 'An']]} />
+            <label data-tip="Bei einer 7 darf man statt abzuwerfen am Glücksrad drehen: 30 % kein Abwurf, 70 % doppelt so viele Karten.">🎰 Las Vegas (Glücksrad)</label>
+            <Auswahl wert={e.gluecksrad} aus={!h} onChange={(w) => setze({ gluecksrad: w })} optionen={[[false, 'Aus'], [true, 'An']]} />
             <label>Zeit pro Zug</label>
             <Auswahl
               wert={e.zugZeit}
