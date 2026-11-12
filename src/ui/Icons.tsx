@@ -2,12 +2,13 @@
 import type { JSX } from 'preact';
 import type { EntwTyp, Gelaende, Rohstoff } from '../engine';
 
+/** Kartenfarbe je Rohstoff; die Werte stehen in tokens.css. */
 export const ROHSTOFF_FARBE: Record<Rohstoff, string> = {
-  holz: '#2f7d4f',
-  lehm: '#c2552d',
-  wolle: '#8cc152',
-  getreide: '#e8b730',
-  erz: '#7b8194',
+  holz: 'var(--r-holz)',
+  lehm: 'var(--r-lehm)',
+  wolle: 'var(--r-wolle)',
+  getreide: 'var(--r-getreide)',
+  erz: 'var(--r-erz)',
 };
 
 export const GELAENDE_FARBE: Record<Gelaende, string> = {
