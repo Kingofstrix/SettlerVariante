@@ -5,6 +5,8 @@ name: Deploy auf GitHub Pages
 on:
   push:
     branches: [main]
+  # Pull Requests: nur testen und bauen (nicht veröffentlichen). Fängt kaputte Merges vor dem Mergen ab.
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -13,7 +15,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,11 +30,13 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:
