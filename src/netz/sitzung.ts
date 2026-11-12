@@ -1,5 +1,5 @@
 // Gemeinsame Schnittstelle, gegen die die Oberfläche arbeitet – egal ob Host, Client, Beamer oder lokales Spiel.
-import type { Aktion, Layout, Sicht } from '../engine';
+import type { Aktion, KartenId, Layout, Sicht } from '../engine';
 
 type OhneSpieler<T> = T extends unknown ? Omit<T, 'spieler'> : never;
 /** Absicht eines Spielers: eine Aktion ohne Spielerindex (den setzt der Host). */
@@ -15,6 +15,8 @@ export interface SitzInfo {
   latenz: number | null;
   weg: Weg;
   istHost: boolean;
+  /** Stimme für die Karte der nächsten Partie; null = noch nicht abgestimmt */
+  stimme: KartenId | null;
 }
 
 export interface Einstellungen {
@@ -101,6 +103,8 @@ export interface Sitzung {
   abonniere(cb: () => void): () => void;
   aktion(a: Absicht): void;
   profil(name: string, farbe: string): void;
+  /** In der Lobby für eine Karte stimmen; null nimmt die Stimme zurück. */
+  stimme(karte: KartenId | null): void;
   chat(text: string): void;
   verlassen(): void;
   readonly host: HostFunktionen | null;

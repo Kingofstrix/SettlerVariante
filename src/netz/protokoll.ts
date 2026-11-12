@@ -1,14 +1,15 @@
 // Versioniertes JSON-Protokoll zwischen Host und Clients. Jede eingehende Nachricht wird geprüft;
 // Unbekanntes oder Ungültiges wird verworfen (null), nie geworfen.
-import type { Brett, Sicht } from '../engine';
+import { istKarte, type Brett, type KartenId, type Sicht } from '../engine';
 import { CHAT_MAX_LAENGE, type Absicht, type ChatEintrag, type Einstellungen, type SitzInfo, type TimerArt } from './sitzung';
 
-export const PROTOKOLL_VERSION = 3; // 2: Chat, Kartenbewegungen; 3: Glücksrad
+export const PROTOKOLL_VERSION = 4; // 2: Chat, Kartenbewegungen; 3: Glücksrad; 4: Karten und Abstimmung
 
 // ---- Client -> Host ----
 export type ClientNachricht =
   | { v: number; t: 'hallo'; token: string; name: string; farbe: string; rolle: 'spieler' | 'beamer' }
   | { v: number; t: 'profil'; name: string; farbe: string }
+  | { v: number; t: 'stimme'; karte: KartenId | null }
   | { v: number; t: 'absicht'; nr: number; aktion: Absicht }
   | { v: number; t: 'pong'; id: number }
   | { v: number; t: 'chat'; text: string };
@@ -62,6 +63,9 @@ export function pruefeClientNachricht(d: unknown): ClientNachricht | null {
       case 'profil':
         if (!text(d.name, 40) || !text(d.farbe, 16)) return null;
         return { v: d.v, t: 'profil', name: d.name, farbe: d.farbe };
+      case 'stimme':
+        if (d.karte !== null && !istKarte(d.karte)) return null;
+        return { v: d.v, t: 'stimme', karte: d.karte };
       case 'absicht':
         if (!zahl(d.nr) || !istObjekt(d.aktion) || typeof d.aktion.typ !== 'string') return null;
         if (!ABSICHT_TYPEN.has(d.aktion.typ)) return null; // insbesondere kein ZEIT_ABGELAUFEN von außen

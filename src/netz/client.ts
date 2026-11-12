@@ -1,5 +1,5 @@
 // Client (Spieler oder Beamer): sendet Absichten an den Host und zeigt dessen gefilterte Sicht an.
-import type { Brett, Sicht } from '../engine';
+import type { Brett, KartenId, Sicht } from '../engine';
 import { ENDE_TEXT, PROTOKOLL_VERSION, pruefeHostNachricht, type ClientNachricht } from './protokoll';
 import { Beobachtbar, STANDARD_EINSTELLUNGEN, type Absicht, type Sitzung, type SitzungsZustand } from './sitzung';
 import { loesche, peerId, type Profil } from './speicher';
@@ -154,6 +154,10 @@ export class Client extends Beobachtbar implements Sitzung {
   profil(name: string, farbe: string): void {
     this.meinProfil = { name, farbe };
     this.sende({ v: PROTOKOLL_VERSION, t: 'profil', name, farbe });
+  }
+
+  stimme(karte: KartenId | null): void {
+    this.sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte });
   }
 
   private aufraeumen(): void {

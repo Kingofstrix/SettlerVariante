@@ -1,5 +1,5 @@
 // Lokales Spiel an einem Gerät (Hot-Seat): alle Spieler teilen sich einen Bildschirm.
-import { amZug, anwenden, neuesSpiel, sichtFuer, type GameState } from '../engine';
+import { amZug, anwenden, neuesSpiel, sichtFuer, type GameState, type KartenId } from '../engine';
 import { Beobachtbar, type Absicht, type Einstellungen, type Sitzung, type SitzungsZustand } from './sitzung';
 import { zufallsSeed, type Profil } from './speicher';
 
@@ -10,12 +10,12 @@ export class LokalSitzung extends Beobachtbar implements Sitzung {
   private wer = 0;
   private hinweisNr = 0;
 
-  constructor(spieler: Profil[], einstellungen: Einstellungen) {
+  constructor(spieler: Profil[], einstellungen: Einstellungen, karte: KartenId = 'klassik') {
     super();
     this.spiel = neuesSpiel({
       spieler,
       seed: zufallsSeed(),
-      config: { layout: einstellungen.layout, siegpunkte: einstellungen.siegpunkte, freundlicherRaeuber: einstellungen.freundlicherRaeuber, gluecksrad: einstellungen.gluecksrad },
+      config: { karte, layout: einstellungen.layout, siegpunkte: einstellungen.siegpunkte, freundlicherRaeuber: einstellungen.freundlicherRaeuber, gluecksrad: einstellungen.gluecksrad },
     });
     this.wer = amZug(this.spiel)[0] ?? 0;
     this.zustand = {
@@ -24,7 +24,7 @@ export class LokalSitzung extends Beobachtbar implements Sitzung {
       meldung: null,
       rolle: 'lokal',
       raumCode: '',
-      sitze: this.spiel.spieler.map((p) => ({ name: p.name, farbe: p.farbe, verbunden: true, latenz: 0, weg: 'lokal', istHost: false })),
+      sitze: this.spiel.spieler.map((p) => ({ name: p.name, farbe: p.farbe, verbunden: true, latenz: 0, weg: 'lokal', istHost: false, stimme: null })),
       meinSitz: null,
       beamer: 0,
       einstellungen: { ...einstellungen, zugZeit: 0 },
@@ -60,6 +60,7 @@ export class LokalSitzung extends Beobachtbar implements Sitzung {
   }
 
   profil(): void {}
+  stimme(): void {}
   chat(): void {}
   verlassen(): void {}
 }
