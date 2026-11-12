@@ -1,6 +1,6 @@
 // Deterministischer Reducer: (state, aktion) => state | fehler. Alle Validierung passiert hier.
 import { erzeugeBrett } from './brett';
-import { mischen, waehle, zufallInt } from './rng';
+import { mischen, waehle, zufall, zufallInt } from './rng';
 import {
   anliegerGegner,
   gueltigeRaeuberHexes,
@@ -15,6 +15,7 @@ import {
 import {
   ENTW_NAME,
   GELAENDE_ROHSTOFF,
+  GLUECKSRAD_CHANCE,
   KOSTEN,
   ROHSTOFFE,
   ROHSTOFF_NAME,
@@ -108,6 +109,9 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
     logNr: 0,
     bewegungen: [],
     bewegungNr: 0,
+    gluecksrad: [],
+    gluecksradNr: 0,
+    gedreht: [],
   };
   log(s, `Spiel gestartet (Seed ${s.seed}). Reihenfolge: ${s.spieler.map((p) => p.name).join(', ')}.`);
   log(s, `Gründungsphase: ${s.spieler[0].name} setzt die erste Siedlung.`);
@@ -142,6 +146,8 @@ function klon(s: GameState): GameState {
     sonderbau: s.sonderbau ? { ...s.sonderbau } : null,
     log: s.log.slice(),
     bewegungen: s.bewegungen.slice(),
+    gluecksrad: s.gluecksrad.slice(),
+    gedreht: s.gedreht.slice(),
   };
 }
 
@@ -374,6 +380,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       const zahl = w[0] + w[1];
       if (zahl === 7) {
         s.abwerfen = {};
+        s.gedreht = [];
         for (const q of s.spieler) {
           const n = summe(q.hand);
           if (n > 7) s.abwerfen[q.id] = Math.floor(n / 2);
@@ -398,6 +405,34 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       zahle(s, a.spieler, karten);
       delete s.abwerfen[a.spieler];
       log(s, `${p.name} wirft ${soll} Karten ab.`);
+      if (Object.keys(s.abwerfen).length === 0) s.phase = 'raeuber';
+      return null;
+    }
+
+    case 'GLUECKSRAD_DREHEN': {
+      const soll = s.abwerfen[a.spieler];
+      if (!s.config.gluecksrad) return 'Das Glücksrad ist in dieser Partie aus.';
+      if (s.phase !== 'abwerfen' || soll === undefined) return UNGUELTIG;
+      if (s.gedreht.includes(a.spieler)) return 'Du hast schon am Glücksrad gedreht.';
+      s.gedreht.push(a.spieler);
+      const gewonnen = zufall(s) < GLUECKSRAD_CHANCE;
+      const handSumme = summe(p.hand);
+      const nachher = gewonnen ? 0 : Math.min(2 * soll, handSumme);
+      s.gluecksradNr++;
+      s.gluecksrad.push({ nr: s.gluecksradNr, spieler: a.spieler, gewonnen, vorher: soll, nachher, alle: !gewonnen && nachher === handSumme });
+      if (s.gluecksrad.length > 10) s.gluecksrad.splice(0, s.gluecksrad.length - 10);
+      if (gewonnen) {
+        delete s.abwerfen[a.spieler];
+        log(s, `🎰 ${p.name} dreht am Glücksrad – GEWONNEN! Kein Abwurf.`);
+      } else if (nachher === handSumme) {
+        // Doppeltes Soll ist die ganze Hand: alles direkt abwerfen
+        zahle(s, a.spieler, { ...p.hand });
+        delete s.abwerfen[a.spieler];
+        log(s, `🎰 ${p.name} dreht am Glücksrad – verloren! Alle ${nachher} Karten sind weg.`);
+      } else {
+        s.abwerfen[a.spieler] = nachher;
+        log(s, `🎰 ${p.name} dreht am Glücksrad – verloren! Jetzt ${nachher} statt ${soll} Karten abwerfen.`);
+      }
       if (Object.keys(s.abwerfen).length === 0) s.phase = 'raeuber';
       return null;
     }

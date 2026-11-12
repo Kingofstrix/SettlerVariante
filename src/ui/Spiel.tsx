@@ -25,6 +25,7 @@ import { EntwIcon, ROHSTOFF_FARBE, RohstoffIcon } from './Icons';
 import { useKartenFluege } from './animation';
 import { ChatEingabe, ChatVerlauf } from './Chat';
 import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WurfAnzeige, statusText } from './Teile';
+import { GluecksradBuehne, useGluecksrad } from './Gluecksrad';
 import { WuerfelBuehne, useWuerfelAnimation } from './WuerfelBuehne';
 import { toast, useRestzeit, useSitzung } from './hooks';
 import { setzeTon, ton, tonAn } from './ton';
@@ -110,6 +111,7 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
   const [, neu] = useState(0);
   useEreignisse(z, sicht);
   const { anim: wuerfelAnim, starte: wuerfelStart, zentral: wurfZentral } = useWuerfelAnimation(sicht, z.hinweis?.nr);
+  const rad = useGluecksrad(sicht, false, z.hinweis?.nr);
   useKartenFluege(sicht);
 
   const binAktiv = sicht.aktiv === ich;

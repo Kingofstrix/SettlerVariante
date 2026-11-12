@@ -118,13 +118,19 @@ export interface SpielConfig {
   siegpunkte: number; // 8, 10 oder 12
   freundlicherRaeuber: boolean;
   sonderbauAutoSkip: boolean; // Spieler, die nichts bauen können, in der Sonderbauphase überspringen
+  /** Las-Vegas-Variante: Bei einer 7 darf man statt abzuwerfen am Glücksrad drehen. */
+  gluecksrad: boolean;
 }
+
+/** Gewinnchance am Glücksrad. */
+export const GLUECKSRAD_CHANCE = 0.3;
 
 export const STANDARD_CONFIG: SpielConfig = {
   layout: 'zufall',
   siegpunkte: 10,
   freundlicherRaeuber: false,
   sonderbauAutoSkip: true,
+  gluecksrad: false,
 };
 
 export interface Handelsangebot {
@@ -143,6 +149,19 @@ export interface Bewegung {
   nach: number | null;
   r: Rohstoff | 'entw';
   n: number;
+}
+
+/** Ergebnis eines Drehs am Glücksrad (öffentlich, für die Animation). */
+export interface GluecksradDreh {
+  nr: number;
+  spieler: number;
+  gewonnen: boolean;
+  /** Abwurf-Soll vor dem Dreh */
+  vorher: number;
+  /** Abwurf-Soll nach dem Dreh (0 bei Gewinn) */
+  nachher: number;
+  /** Verloren und das doppelte Soll war die ganze Hand: alles wurde direkt abgeworfen */
+  alle: boolean;
 }
 
 export interface LogEintrag {
@@ -186,12 +205,17 @@ export interface GameState {
   /** Die letzten Kartenbewegungen (für Animationen), mit fortlaufender Nummer. */
   bewegungen: Bewegung[];
   bewegungNr: number;
+  /** Die letzten Drehs am Glücksrad und wer bei der aktuellen 7 schon gedreht hat. */
+  gluecksrad: GluecksradDreh[];
+  gluecksradNr: number;
+  gedreht: number[];
 }
 
 // Aktionen (Intentionen). "spieler" setzt immer der Host anhand der Verbindung.
 export type Aktion =
   | { typ: 'WUERFELN'; spieler: number }
   | { typ: 'ABWERFEN'; spieler: number; karten: Partial<Rohstoffe> }
+  | { typ: 'GLUECKSRAD_DREHEN'; spieler: number }
   | { typ: 'RAEUBER_SETZEN'; spieler: number; hex: number }
   | { typ: 'STEHLEN'; spieler: number; opfer: number }
   | { typ: 'STRASSE_BAUEN'; spieler: number; kante: number }

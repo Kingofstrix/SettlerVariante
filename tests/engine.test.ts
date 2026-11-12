@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   GELAENDE_ROHSTOFF,
+  GLUECKSRAD_CHANCE,
+  zufall,
   anwenden,
   gesamtPunkte,
   gueltigeRaeuberHexes,
@@ -536,5 +538,94 @@ describe('Kartenbewegungen (für Animationen)', () => {
     let t = nachSetup(spiel(4));
     for (let i = 0; i < 300; i++) t = ok(t, { typ: 'ZEIT_ABGELAUFEN', spieler: 0 });
     expect(t.bewegungen.length).toBeLessThanOrEqual(40);
+  });
+});
+
+describe('Glücksrad (Las Vegas)', () => {
+  /** Spieler 0 hat "karten" Karten, eine 7 ist gefallen. */
+  function siebenMit(karten: number, gluecksrad = true, rngState?: number): GameState {
+    const s = leer(3, { gluecksrad });
+    gib(s, 0, { holz: Math.min(karten, 10), erz: Math.max(0, karten - 10) });
+    gib(s, 1, { lehm: 9 });
+    s.phase = 'wuerfeln';
+    naechsterWurf(s, 7);
+    const t = ok(s, { typ: 'WUERFELN', spieler: 0 });
+    if (rngState !== undefined) t.rngState = rngState;
+    return t;
+  }
+  /** Sucht einen RNG-Zustand, bei dem der nächste Dreh gewinnt bzw. verliert. */
+  function rngFuer(gewinnen: boolean): number {
+    for (let r = 1; r < 1000; r++) if (zufall({ rngState: r }) < GLUECKSRAD_CHANCE === gewinnen) return r;
+    throw new Error('kein RNG-Zustand');
+  }
+
+  it('Gewinn: kein Abwurf', () => {
+    let s = siebenMit(10, true, rngFuer(true));
+    expect(s.abwerfen).toEqual({ 0: 5, 1: 4 });
+    s = ok(s, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 });
+    expect(s.abwerfen).toEqual({ 1: 4 });
+    expect(summe(s.spieler[0].hand)).toBe(10);
+    expect(s.gluecksrad.at(-1)).toMatchObject({ spieler: 0, gewonnen: true, vorher: 5, nachher: 0 });
+    expect(s.log.at(-1)!.text).toContain('GEWONNEN');
+    expect(pruefeInvarianten(s)).toEqual([]);
+  });
+  it('Verlust: doppelt so viele Karten, selbst gewählt; zweimal drehen geht nicht', () => {
+    let s = siebenMit(10, true, rngFuer(false));
+    s = ok(s, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 });
+    expect(s.abwerfen[0]).toBe(undefined); // 2×5 = 10 = ganze Hand -> alles direkt weg
+    expect(summe(s.spieler[0].hand)).toBe(0);
+    let t = siebenMit(12, true, rngFuer(false)); // Soll 6, doppelt 12 = ganze Hand
+    t = ok(t, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 });
+    expect(summe(t.spieler[0].hand)).toBe(0);
+    let u = siebenMit(9, true, rngFuer(false)); // Soll 4, doppelt 8 < 9
+    u = ok(u, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 });
+    expect(u.abwerfen[0]).toBe(8);
+    expect(u.gluecksrad.at(-1)).toMatchObject({ gewonnen: false, vorher: 4, nachher: 8, alle: false });
+    expect(t.gluecksrad.at(-1)).toMatchObject({ gewonnen: false, vorher: 6, nachher: 12, alle: true });
+    expect(fehler(u, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 })).toContain('schon');
+    fehler(u, { typ: 'ABWERFEN', spieler: 0, karten: { holz: 4 } }); // altes Soll reicht nicht mehr
+    u = ok(u, { typ: 'ABWERFEN', spieler: 0, karten: { holz: 8 } });
+    expect(summe(u.spieler[0].hand)).toBe(1);
+    expect(pruefeInvarianten(u)).toEqual([]);
+  });
+  it('alle fertig nach dem Dreh: weiter zum Räuber; Zeitablauf wirft das neue Soll zufällig ab', () => {
+    let s = siebenMit(9, true, rngFuer(true));
+    s = ok(s, { typ: 'ABWERFEN', spieler: 1, karten: { lehm: 4 } });
+    s = ok(s, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 });
+    expect(s.phase).toBe('raeuber');
+    let t = siebenMit(9, true, rngFuer(false));
+    t = ok(t, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 });
+    t = ok(t, { typ: 'ZEIT_ABGELAUFEN', spieler: 0 });
+    expect(summe(t.spieler[0].hand)).toBe(1);
+    expect(t.phase).toBe('raeuber');
+    expect(pruefeInvarianten(t)).toEqual([]);
+  });
+  it('nur bei eingeschalteter Variante, nur wer abwerfen muss, nur in der Abwurfphase', () => {
+    const aus = siebenMit(10, false);
+    expect(fehler(aus, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 })).toContain('aus');
+    const s = siebenMit(10);
+    fehler(s, { typ: 'GLUECKSRAD_DREHEN', spieler: 2 }); // muss nicht abwerfen
+    fehler(leer(3, { gluecksrad: true }), { typ: 'GLUECKSRAD_DREHEN', spieler: 0 });
+    // bei der nächsten 7 darf man wieder drehen
+    let t = ok(s, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 });
+    expect(t.gedreht).toEqual([0]);
+    t.phase = 'wuerfeln';
+    t.abwerfen = {};
+    gib(t, 0, { wolle: 8 });
+    naechsterWurf(t, 7);
+    t = ok(t, { typ: 'WUERFELN', spieler: 0 });
+    expect(t.gedreht).toEqual([]);
+    ok(t, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 });
+  });
+  it('Gewinnchance liegt bei etwa 30 %', () => {
+    let gewonnen = 0;
+    const n = 2000;
+    const basis = siebenMit(10);
+    for (let i = 0; i < n; i++) {
+      const s = { ...basis, rngState: i * 7919 + 13 };
+      if (ok(s, { typ: 'GLUECKSRAD_DREHEN', spieler: 0 }).gluecksrad.at(-1)!.gewonnen) gewonnen++;
+    }
+    expect(gewonnen / n).toBeGreaterThan(0.26);
+    expect(gewonnen / n).toBeLessThan(0.34);
   });
 });

@@ -52,6 +52,7 @@ Im Spiel:
 - **Würfeln:** Wer dran ist, sieht die Würfel groß in der Brettmitte. Würfeln per Klick, Leertaste oder Enter. Ein Ritter lässt sich vorher unten in der Handleiste ausspielen. Nach dem Wurf fliegen die Würfel mit dem Ergebnis an den Rand.
 - **Bank:** In der Seitenleiste steht je Rohstoff oben die Zahl in der Bank, unten die Zahl bei allen Spielern zusammen. Daneben der Stapel der Entwicklungskarten.
 - **Handel:** Angebote an dich erscheinen groß oben über dem Brett, aus deiner Sicht formuliert („Du bekommst … / Du gibst …“), mit Annehmen, Ablehnen und Gegenangebot. Wer ein Angebot macht, sieht pro Mitspieler, ob er noch überlegt oder abgelehnt hat.
+- **Las Vegas (Glücksrad):** Muss man bei einer 7 abwerfen, darf man stattdessen am Glücksrad drehen. 30 %: nichts abwerfen. 70 %: doppelt so viele Karten abwerfen (höchstens die ganze Hand; ist es die ganze Hand, ist sie sofort weg). Pro 7 nur ein Dreh. Den Zufall zieht der Host, das Rad landet passend dazu. Nach einem Dreh beginnt die Abwurfzeit neu. Der Beamer zeigt jeden Dreh groß, die anderen Spieler bekommen eine Einblendung. Abschaltbar in der Lobby.
 - **Chat:** Reiter „Chat“ neben dem Verlauf (auch in der Lobby). Ungelesene Nachrichten zeigt eine Zahl am Reiter. Höchstens 5 Nachrichten in 10 Sekunden pro Person, 200 Zeichen je Nachricht. Der Beamer liest nur mit.
 - **Animationen:** Karten fliegen zwischen Hand, Bank und Mitspielern. Bei fremden Spielern ist nur dann zu sehen, welcher Rohstoff fliegt, wenn die Bank beteiligt ist (das ist ohnehin öffentlich). Diebstahl und Handel zwischen zwei anderen zeigen verdeckte Karten. Mit „Bewegung reduzieren“ im Betriebssystem sind alle Animationen aus.
 
@@ -163,7 +164,7 @@ Grundsätze:
 Regeln, die im Auftrag offen waren, sind so umgesetzt:
 
 1. **Anfänger-Layout**: eigenes festes, ausgeglichenes Layout (per fester Suche erzeugt), nicht die Originalaufstellung.
-2. **Varianten** in der Lobby: Siegpunkte 8/10/12 und „Freundlicher Räuber“ (Spieler mit höchstens 2 sichtbaren Punkten sind geschützt). Standard: 10 Punkte, Räuber normal.
+2. **Varianten** in der Lobby: Siegpunkte 8/10/12, „Freundlicher Räuber“ (Spieler mit höchstens 2 sichtbaren Punkten sind geschützt) und „Las Vegas“ (Glücksrad bei 7). Standard: 10 Punkte, Räuber normal, Glücksrad an.
 3. **Sonderbauphase**: Wer mit seiner Hand nichts bauen oder kaufen kann, wird automatisch übersprungen. Das spart viel Zeit, verrät aber minimal etwas über die Hand. Abschaltbar über `sonderbauAutoSkip` in der Spielkonfiguration (`src/engine/typen.ts`).
 4. **Sieg in der Sonderbauphase** gibt es nicht: Wer dort 10 Punkte erreicht, gewinnt zu Beginn seines eigenen Zugs.
 5. **Bestehlen**: Gibt es nur einen möglichen Betroffenen, wird direkt gezogen; bei mehreren wählt der Spieler.

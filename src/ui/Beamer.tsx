@@ -6,6 +6,7 @@ import { Brett } from './Brett';
 import { HilfeDialog } from './Dialoge';
 import { EndeDialog, Menue } from './Spiel';
 import { useKartenFluege } from './animation';
+import { GluecksradBuehne, useGluecksrad } from './Gluecksrad';
 import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WurfAnzeige, statusText } from './Teile';
 import { useSitzung } from './hooks';
 
@@ -15,6 +16,7 @@ export function BeamerAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVe
   const [dialog, setDialog] = useState<null | 'hilfe' | 'menue'>(null);
   const status = statusText(sicht);
   const sonderbau = sicht.phase === 'sonderbau';
+  const rad = useGluecksrad(sicht, true, undefined);
   useKartenFluege(sicht);
   return (
     <div class="beamer">
@@ -50,6 +52,7 @@ export function BeamerAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVe
       </aside>
       {dialog === 'hilfe' && <HilfeDialog onZu={() => setDialog(null)} />}
       {dialog === 'menue' && <Menue sitzung={sitzung} z={z} onZu={() => setDialog(null)} onVerlassen={onVerlassen} />}
+      {rad.anzeige && <GluecksradBuehne key={rad.anzeige.id} anzeige={rad.anzeige} onFertig={rad.fertig} eilig={rad.wartend > 0} />}
       {sicht.phase === 'ende' && <EndeDialog sitzung={sitzung} sicht={sicht} onVerlassen={onVerlassen} />}
     </div>
   );
