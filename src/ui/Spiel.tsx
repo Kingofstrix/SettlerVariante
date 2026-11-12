@@ -369,7 +369,19 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
         </div>
       </footer>
 
-      {sicht.phase === 'abwerfen' && sicht.abwerfen[ich] !== undefined && <AbwerfenMitRestzeit sicht={sicht} aktion={aktion} timer={z.timer} />}
+      {sicht.phase === 'abwerfen' && sicht.abwerfen[ich] !== undefined && (
+        <AbwerfenMitRestzeit
+          sicht={sicht}
+          aktion={aktion}
+          timer={z.timer}
+          onDrehen={() => {
+            if (z.pausiert) return;
+            rad.starte();
+            aktion({ typ: 'GLUECKSRAD_DREHEN' });
+          }}
+        />
+      )}
+      {rad.anzeige && <GluecksradBuehne key={rad.anzeige.id} anzeige={rad.anzeige} onFertig={rad.fertig} eilig={rad.wartend > 0} />}
       {sicht.phase === 'stehlen' && binAktiv && <StehlenDialog sicht={sicht} aktion={aktion} />}
       {dialog === 'handel' && sicht.phase === 'aktion' && <HandelDialog sicht={sicht} vorlage={gegen} aktion={aktion} onZu={() => setDialog(null)} />}
       {dialog === 'erfindung' && <ErfindungDialog sicht={sicht} aktion={aktion} onZu={() => setDialog(null)} />}
@@ -382,9 +394,19 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
 }
 
 /** Hält den Sekundentakt der Restzeit aus der Spielansicht heraus: Nur dieser Dialog rendert viermal je Sekunde neu. */
-function AbwerfenMitRestzeit({ sicht, aktion, timer }: { sicht: Sicht; aktion: (a: Absicht) => void; timer: TimerAnzeige | null }): JSX.Element {
+function AbwerfenMitRestzeit({
+  sicht,
+  aktion,
+  timer,
+  onDrehen,
+}: {
+  sicht: Sicht;
+  aktion: (a: Absicht) => void;
+  timer: TimerAnzeige | null;
+  onDrehen: () => void;
+}): JSX.Element {
   const rest = useRestzeit(timer?.art === 'abwerfen' ? timer : null);
-  return <AbwerfenDialog sicht={sicht} aktion={aktion} rest={rest} />;
+  return <AbwerfenDialog sicht={sicht} aktion={aktion} rest={rest} onDrehen={onDrehen} />;
 }
 
 export function EndeDialog({ sitzung, sicht, onVerlassen }: { sitzung: Sitzung; sicht: Sicht; onVerlassen: () => void }): JSX.Element {
