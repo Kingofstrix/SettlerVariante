@@ -5,6 +5,7 @@ import { FARBEN, farbHex, type Einstellungen, type Sitzung } from '../netz/sitzu
 import { ChatBox } from './Chat';
 import { HilfeDialog } from './Dialoge';
 import { useSitzung } from './hooks';
+import { Rangliste } from './Rangliste';
 
 function Auswahl<T extends string | number | boolean>({
   wert,
@@ -117,7 +118,8 @@ export function Lobby({ sitzung, onVerlassen }: { sitzung: Sitzung; onVerlassen:
             </tbody>
           </table>
           <p class="hinweis">
-            Beamer verbunden: {z.beamer}. {gross ? 'Ab 5 Spielern: großes Brett mit Sonderbauphase.' : '3–4 Spieler: normales Brett.'}
+            Beamer verbunden: {z.beamer}.{' '}
+            {gross ? `Ab 5 Spielern: großes Brett${e.sonderbauphase ? ' mit Sonderbauphase' : ''}.` : '3–4 Spieler: normales Brett.'}
           </p>
 
           {ich && (
@@ -165,9 +167,18 @@ export function Lobby({ sitzung, onVerlassen }: { sitzung: Sitzung; onVerlassen:
               onChange={(w) => setze({ zugZeit: w })}
               optionen={[[0, 'Aus'], [60, '60 s'], [90, '90 s'], [120, '120 s'], [180, '180 s']]}
             />
-            <label>Sonderbauphase</label>
-            <Auswahl wert={e.sonderbauZeit} aus={!h || e.zugZeit === 0} onChange={(w) => setze({ sonderbauZeit: w })} optionen={[[10, '10 s'], [20, '20 s'], [30, '30 s'], [45, '45 s']]} />
-            <label>Abwerfen bei 7</label>
+            <label data-tip="Nur bei 5–6 Spielern: Nach jedem Zug dürfen alle anderen reihum bauen.">Sonderbauphase</label>
+            <Auswahl wert={e.sonderbauphase} aus={!h} onChange={(w) => setze({ sonderbauphase: w })} optionen={[[true, 'An'], [false, 'Aus']]} />
+            <label>Zeit Sonderbau</label>
+            <Auswahl wert={e.sonderbauZeit} aus={!h || e.zugZeit === 0 || !e.sonderbauphase} onChange={(w) => setze({ sonderbauZeit: w })} optionen={[[10, '10 s'], [20, '20 s'], [30, '30 s'], [45, '45 s']]} />
+            <label data-tip="Bei einer 7 gibt die Hälfte ab, wer mehr Karten als diese Grenze hat.">Abwerfen ab</label>
+            <Auswahl
+              wert={e.abwurfGrenze}
+              aus={!h}
+              onChange={(w) => setze({ abwurfGrenze: w })}
+              optionen={[[7, 'mehr als 7'], [9, 'mehr als 9']]}
+            />
+            <label>Zeit Abwerfen</label>
             <Auswahl wert={e.abwerfZeit} aus={!h || e.zugZeit === 0} onChange={(w) => setze({ abwerfZeit: w })} optionen={[[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s']]} />
           </div>
           {h ? (
@@ -185,6 +196,7 @@ export function Lobby({ sitzung, onVerlassen }: { sitzung: Sitzung; onVerlassen:
           <h2>Chat</h2>
           <ChatBox eintraege={z.chat} meinName={ich?.name ?? null} onSenden={ich ? (text) => sitzung.chat(text) : null} />
         </section>
+        <Rangliste />
       </div>
       {hilfe && <HilfeDialog onZu={() => setHilfe(false)} />}
     </div>

@@ -242,6 +242,51 @@
   stroke-linecap: round;
 }
 
+/* ---------- Neue Bauten der anderen, Fokus aus dem Verlauf ---------- */
+
+.gebaeude.neu {
+  animation: einfallen 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+@keyframes einfallen {
+  from {
+    transform: translateY(-40px) scale(1.3);
+    opacity: 0;
+  }
+}
+circle.markierung {
+  fill: var(--weiss);
+  fill-opacity: 0.35;
+  stroke-width: 6;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: puls 1s ease-in-out 3;
+}
+line.markierung {
+  stroke: var(--weiss);
+  stroke-width: 34;
+  stroke-linecap: round;
+  stroke-opacity: 0.85;
+  pointer-events: none;
+  animation: saum 1s ease-in-out 3;
+}
+@keyframes saum {
+  50% {
+    stroke-opacity: 0.45;
+  }
+}
+.fokus {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 8;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: puls 0.8s ease-in-out infinite;
+}
+
 /* ---------- Klickbare Bauplätze ---------- */
 
 .ziel {

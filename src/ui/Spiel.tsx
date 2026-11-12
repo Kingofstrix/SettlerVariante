@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   ENTW_NAME,
   KOSTEN,
+  TITEL,
+  titel,
   ROHSTOFFE,
   ROHSTOFF_NAME,
   gueltigeRaeuberHexes,
@@ -13,6 +15,7 @@ import {
   gueltigeStrassenKanten,
   type EntwTyp,
   type Handelsangebot,
+  type Ort,
   type Rohstoffe,
   type Sicht,
 } from '../engine';
@@ -20,11 +23,13 @@ import { LokalSitzung } from '../netz/lokal';
 import { farbHex, type Absicht, type Sitzung, type SitzungsZustand, type TimerAnzeige } from '../netz/sitzung';
 import { DEV } from '../netz/speicher';
 import { Brett, KEINE_ZIELE, type Ziele } from './Brett';
-import { AbwerfenDialog, ErfindungDialog, HandelDialog, HilfeDialog, Modal, MonopolDialog, RohstoffListe, StehlenDialog } from './Dialoge';
+import { AbwerfenDialog, ErfindungDialog, HandelDialog, HilfeDialog, Modal, MonopolDialog, RohstoffListe, StehlenDialog, WunschDialog } from './Dialoge';
 import { EntwIcon, ROHSTOFF_FARBE, RohstoffIcon } from './Icons';
-import { useKartenFluege } from './animation';
+import { useKartenFluege, wenigBewegung } from './animation';
 import { ChatEingabe, ChatVerlauf } from './Chat';
-import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WurfAnzeige, statusText } from './Teile';
+import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WunschTafel, WurfAnzeige, statusText } from './Teile';
+import { PunkteVerlauf, WuerfelVerteilung } from './Statistik';
+import { logSymbol, neueBauten } from './verlauf';
 import { WuerfelBuehne, useWuerfelAnimation } from './WuerfelBuehne';
 import { toast, useRestzeit, useSitzung } from './hooks';
 import { setzeTon, ton, tonAn } from './ton';
@@ -76,10 +81,16 @@ function useEreignisse(z: SitzungsZustand, sicht: Sicht): void {
   // Wichtige Logzeilen als Toast
   const letzteNr = useRef(sicht.log.at(-1)?.nr ?? 0);
   useEffect(() => {
+    let fremd = false;
     for (const l of sicht.log) {
       if (l.nr <= letzteNr.current) continue;
       if (/stiehlt|Längste Handelsstraße|Größte Rittermacht|Monopol|gewinnt/.test(l.text)) toast(l.text);
+      else if (!lokal && l.wer !== undefined && l.wer !== ich && /baut eine (Siedlung|Stadt)|kauft eine Entwicklungskarte|versetzt den Räuber/.test(l.text)) {
+        toast(`${logSymbol(l.text)} ${l.text}`);
+        fremd = true;
+      }
     }
+    if (fremd) ton('fremd');
     letzteNr.current = sicht.log.at(-1)?.nr ?? 0;
   }, [sicht.log.at(-1)?.nr]);
 
@@ -105,7 +116,14 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
   const aktion = (a: Absicht): void => sitzung.aktion(a);
 
   const [bauart, setBauart] = useState<Bauart | null>(null);
-  const [dialog, setDialog] = useState<null | 'handel' | 'erfindung' | 'monopol' | 'hilfe' | 'menue'>(null);
+  const [dialog, setDialog] = useState<null | 'handel' | 'erfindung' | 'monopol' | 'hilfe' | 'menue' | 'wunsch'>(null);
+  const [fokus, setFokus] = useState<Ort | null>(null);
+  useEffect(() => {
+    if (!fokus) return;
+    const t = setTimeout(() => setFokus(null), 2500);
+    return () => clearTimeout(t);
+  }, [fokus]);
+  const markiert = useMemo(() => neueBauten(sicht), [sicht.log.at(-1)?.nr, sicht.zugNr, sicht.phase, ich]);
   const [gegen, setGegen] = useState<Handelsangebot | undefined>(undefined);
   const [, neu] = useState(0);
   useEreignisse(z, sicht);
@@ -211,6 +229,8 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
         <Brett
           sicht={sicht}
           ziele={ziele}
+          markiert={markiert}
+          fokus={fokus}
           meineFarbe={farbHex(mein.farbe)}
           onEcke={(ecke) => {
             ton('bau');
@@ -223,6 +243,8 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
           }}
           onHex={(hex) => aktion({ typ: 'RAEUBER_SETZEN', hex })}
         />
+
+        <WunschTafel sicht={sicht} />
 
         <AngebotsListe
           sicht={sicht}
@@ -311,7 +333,7 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
           </div>
         </div>
         <BankAnzeige sicht={sicht} />
-        <VerlaufUndChat z={z} sitzung={sitzung} />
+        <VerlaufUndChat z={z} sitzung={sitzung} onOrt={setFokus} />
       </aside>
 
       <footer class="handleiste">
@@ -341,6 +363,9 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
           })}
         </div>
         <div class="zugknoepfe">
+          <button class="knopf" data-tip="Allen zeigen, was du suchst und was du bietest" onClick={() => setDialog('wunsch')}>
+            📣 Suche/Biete
+          </button>
           <span class="tip-halter" data-tip={handelGrund ?? undefined}>
             <button
               class="knopf"
@@ -373,7 +398,10 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
       {dialog === 'erfindung' && <ErfindungDialog sicht={sicht} aktion={aktion} onZu={() => setDialog(null)} />}
       {dialog === 'monopol' && <MonopolDialog aktion={aktion} onZu={() => setDialog(null)} />}
       {dialog === 'hilfe' && <HilfeDialog onZu={() => setDialog(null)} />}
-      {dialog === 'menue' && <Menue sitzung={sitzung} z={z} onZu={() => setDialog(null)} onVerlassen={onVerlassen} />}
+      {dialog === 'wunsch' && sicht.phase !== 'ende' && <WunschDialog sicht={sicht} aktion={aktion} onZu={() => setDialog(null)} />}
+      {dialog === 'menue' && (
+        <Menue sitzung={sitzung} z={z} onZu={() => setDialog(null)} onVerlassen={onVerlassen} />
+      )}
       {sicht.phase === 'ende' && <EndeDialog sitzung={sitzung} sicht={sicht} onVerlassen={onVerlassen} />}
     </div>
   );
@@ -385,38 +413,117 @@ function AbwerfenMitRestzeit({ sicht, aktion, timer }: { sicht: Sicht; aktion: (
   return <AbwerfenDialog sicht={sicht} aktion={aktion} rest={rest} />;
 }
 
+/** Kurzes Konfetti zum Sieg (aus bei "Bewegung reduzieren"). */
+function Konfetti(): JSX.Element | null {
+  const teile = useMemo(
+    () =>
+      Array.from({ length: 48 }, (_, i) => ({
+        links: Math.random() * 100,
+        verz: Math.random() * 0.8,
+        dauer: 2.2 + Math.random() * 1.6,
+        farbe: ['#d83a34', '#2b6fdb', '#f28c1e', '#2fa35b', 'var(--gold)', '#8b5a2b'][i % 6],
+        dreh: Math.random() * 360,
+      })),
+    [],
+  );
+  if (wenigBewegung()) return null;
+  return (
+    <div class="konfetti" aria-hidden="true">
+      {teile.map((t) => (
+        <i style={{ left: `${t.links}%`, background: t.farbe, animationDelay: `${t.verz}s`, animationDuration: `${t.dauer}s`, rotate: `${t.dreh}deg` }} />
+      ))}
+    </div>
+  );
+}
+
 export function EndeDialog({ sitzung, sicht, onVerlassen }: { sitzung: Sitzung; sicht: Sicht; onVerlassen: () => void }): JSX.Element {
   const [zu, setZu] = useState(false);
   if (zu) return <button class="knopf haupt ende-wieder" onClick={() => setZu(false)}>🏆 Ergebnis</button>;
   const rang = [...sicht.spieler].sort((a, b) => sicht.endstand![b.id] - sicht.endstand![a.id]);
+  const st = sicht.statistik;
+  const t = st ? titel(st) : sicht.spieler.map((): string[] => []);
+  const titelText = (name: string): string => TITEL.find((x) => x.name === name)?.text ?? '';
+  // Podest: Zweiter, Erster, Dritter
+  const podest = [rang[1], rang[0], rang[2]].filter(Boolean);
   return (
-    <Modal titel={`🏆 ${sicht.spieler[sicht.gewinner!].name} gewinnt!`} onZu={() => setZu(true)}>
-      <table class="endstand">
-        <tbody>
-          {rang.map((p, i) => (
-            <tr>
-              <td>{i + 1}.</td>
-              <td>
-                <i class="punkt" style={{ background: farbHex(p.farbe) }} /> {p.name}
-              </td>
-              <td>
-                <b>{sicht.endstand![p.id]}</b> Punkte
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <footer>
-        <button class="knopf" onClick={onVerlassen}>
-          Verlassen
-        </button>
-        {sitzung.host && (
-          <button class="knopf haupt" onClick={() => sitzung.host!.zurLobby()}>
-            Zurück zur Lobby
-          </button>
+    <>
+      <Konfetti />
+      <Modal titel={`🏆 ${sicht.spieler[sicht.gewinner!].name} gewinnt!`} onZu={() => setZu(true)} breit>
+        <div class="podest">
+          {podest.map((p) => {
+            const platz = rang.indexOf(p) + 1;
+            return (
+              <div class={`podest-platz p${platz}`} style={{ '--sf': farbHex(p.farbe) }}>
+                <b class="podest-name">{p.name}</b>
+                <span class="podest-punkte">{sicht.endstand![p.id]} Punkte</span>
+                {t[p.id].map((x) => (
+                  <span class="marke" data-tip={titelText(x)}>
+                    {x}
+                  </span>
+                ))}
+                <div class="podest-stufe">{platz}</div>
+              </div>
+            );
+          })}
+        </div>
+        {st && (
+          <>
+            <table class="endstand">
+              <thead>
+                <tr>
+                  <th />
+                  <th>Spieler</th>
+                  <th>Punkte</th>
+                  <th>Würfelertrag</th>
+                  <th>Tauschvorgänge</th>
+                  <th>Gestohlen</th>
+                  <th>Titel</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rang.map((p, i) => (
+                  <tr>
+                    <td>{i + 1}.</td>
+                    <td>
+                      <i class="punkt" style={{ background: farbHex(p.farbe) }} /> {p.name}
+                    </td>
+                    <td>
+                      <b>{sicht.endstand![p.id]}</b>
+                    </td>
+                    <td>{st.ertrag[p.id]}</td>
+                    <td>{st.handel[p.id]}</td>
+                    <td>{st.diebstahl[p.id]}</td>
+                    <td>
+                      {t[p.id].map((x) => (
+                        <span class="marke" data-tip={titelText(x)}>
+                          {x}
+                        </span>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div class="diagramme">
+              <PunkteVerlauf sicht={sicht} st={st} />
+              <WuerfelVerteilung st={st} />
+            </div>
+          </>
         )}
-      </footer>
-    </Modal>
+        <footer>
+          <button class="knopf" onClick={onVerlassen}>
+            Verlassen
+          </button>
+          {sitzung.host ? (
+            <button class="knopf haupt" onClick={() => sitzung.host!.zurLobby()}>
+              ↻ Revanche (zurück zur Lobby)
+            </button>
+          ) : (
+            !(sitzung instanceof LokalSitzung) && <span class="hinweis">Der Host kann eine Revanche starten.</span>
+          )}
+        </footer>
+      </Modal>
+    </>
   );
 }
 
@@ -441,6 +548,7 @@ export function Menue({ sitzung, z, onZu, onVerlassen }: { sitzung: Sitzung; z: 
             🔔 Browser-Benachrichtigung „Du bist dran“ erlauben
           </button>
         )}
+
         {h && (
           <>
             <button class="knopf" onClick={() => h.pause(!z.pausiert)}>
@@ -509,7 +617,7 @@ export function Menue({ sitzung, z, onZu, onVerlassen }: { sitzung: Sitzung; z: 
 }
 
 /** Seitenleiste unten: Spielverlauf und Chat als Reiter, mit Zähler für ungelesene Nachrichten. */
-export function VerlaufUndChat({ z, sitzung }: { z: SitzungsZustand; sitzung: Sitzung }): JSX.Element {
+export function VerlaufUndChat({ z, sitzung, onOrt }: { z: SitzungsZustand; sitzung: Sitzung; onOrt?: (o: Ort) => void }): JSX.Element {
   const [reiter, setReiter] = useState<'log' | 'chat'>('log');
   const letzte = z.chat.at(-1)?.nr ?? 0;
   const [gelesen, setGelesen] = useState(letzte);
@@ -534,7 +642,7 @@ export function VerlaufUndChat({ z, sitzung }: { z: SitzungsZustand; sitzung: Si
   }, [letzte]);
 
   const ungelesen = z.chat.filter((c) => c.nr > gelesen && c.name !== meinName).length;
-  if (!mitChat) return <LogListe sicht={sicht} />;
+  if (!mitChat) return <LogListe sicht={sicht} onOrt={onOrt} />;
   return (
     <div class="verlauf-chat">
       <div class="reiter" role="tablist">
@@ -546,7 +654,7 @@ export function VerlaufUndChat({ z, sitzung }: { z: SitzungsZustand; sitzung: Si
         </button>
       </div>
       {reiter === 'log' ? (
-        <LogListe sicht={sicht} />
+        <LogListe sicht={sicht} onOrt={onOrt} />
       ) : (
         <div class="chat">
           <ChatVerlauf eintraege={z.chat} meinName={meinName} />

@@ -73,12 +73,14 @@ Wo jede Regel umgesetzt und getestet ist. Pfade relativ zu `src/engine/` bzw. `t
 | Sieg bei 10 Punkten, nur im eigenen Zug; verdeckte Siegpunkte zählen | `engine.ts`: `pruefeSieg` | „10 Punkte im eigenen Zug …“, „nicht aktiver Spieler mit 10 Punkten gewinnt erst zu Beginn seines Zugs“ |
 | Variante 8/12 Siegpunkte | `SpielConfig.siegpunkte` | „Variante: 8 Siegpunkte“ |
 | Variante Freundlicher Räuber | `regeln.ts`: `gueltigeRaeuberHexes` | „Freundlicher Räuber schützt Spieler mit höchstens 2 Punkten“ |
+| Variante Abwurfgrenze 7/9 | `SpielConfig.abwurfGrenze`; `engine.ts`: `WUERFELN` | `erweiterungen.test.ts` „9: erst ab 10 Karten …“, „7: wie bisher …“ |
 
 ## Sonderbauphase (5–6 Spieler)
 
 | Regel | Umsetzung | Test |
 |---|---|---|
 | Nur bei 5–6 Spielern | `engine.ts`: `ZUG_BEENDEN` | „3–4 Spieler: keine Sonderbauphase“ |
+| In der Lobby abschaltbar | `SpielConfig.sonderbauphase` | `erweiterungen.test.ts` „aus: bei 5 Spielern geht es direkt zum nächsten Zug“ |
 | Alle anderen reihum; nur bauen und Entwicklungskarten kaufen | `engine.ts`: Flag `baut`, `SONDERBAU_FERTIG`, `sonderbauWeiter` | „alle anderen bauen reihum; nur Bauen und Kaufen erlaubt“ |
 | Kein Handel, keine Karten ausspielen | Phasenprüfung in den Handels- und Kartenaktionen | dito |
 | Auto-Skip, wenn nichts baubar | `engine.ts`: `kannEtwasBauen` | „Auto-Skip überspringt Spieler, die nichts bauen können“ |
@@ -117,6 +119,14 @@ Wo jede Regel umgesetzt und getestet ist. Pfade relativ zu `src/engine/` bzw. `t
 | Gut sichtbare Handelsangebote | `ui/Teile.tsx`: `AngebotsListe` | von Hand |
 | Würfel in der Mitte, danach an den Rand | `ui/WuerfelBuehne.tsx` | von Hand |
 | Kartenflug Hand ↔ Bank ↔ Mitspieler | `engine/engine.ts`: `bewege`; `engine/sicht.ts`; `ui/animation.tsx` | `engine.test.ts` „Kartenbewegungen …“ (3 Tests, u. a. kein Verraten des Rohstoffs an Dritte) |
+| Würfelertrag fliegt vom Feld | `engine.ts`: `verteile` (`Bewegung.hex`); `ui/animation.tsx` | `erweiterungen.test.ts` „jede Bewegung nennt das Feld …“ |
+| Verlauf mit Zug, Spieler und Ort; neue Bauten markiert | `engine.ts`: `log`; `ui/verlauf.ts`; `ui/Teile.tsx`: `LogListe`; `ui/Brett.tsx` | `erweiterungen.test.ts` „Logdaten“ (2 Tests) |
+| Statistik, erst bei Spielende sichtbar | `engine.ts`: `statistik`; `sicht.ts`; `ui/Statistik.tsx` | `erweiterungen.test.ts` „Statistik“ (2 Tests) |
+| Titel (Räuberbaron, Handelsfürst, Pechvogel) | `engine.ts`: `TITEL`, `titel` | `erweiterungen.test.ts` „Titel …“ |
+| Wunschliste Suche/Biete | `engine.ts`: `WUNSCH_SETZEN`; `ui/Teile.tsx`: `WunschTafel`; `ui/Dialoge.tsx`: `WunschDialog` | `erweiterungen.test.ts` „Wunschliste“ (2 Tests) |
+| Unmögliche Handel | `ui/Dialoge.tsx`: `HandelDialog` | von Hand |
+| Rangliste (verteilt, ohne Doppelte, Spielende einmal) | `netz/rangliste.ts`; `netz/host.ts`: `pruefeEnde`; `netz/client.ts` | `host.test.ts` „Spielende wird einmal eingetragen …“ |
+| Alte Spielstände ohne neue Felder laden | `netz/host.ts`: `pruefeHostDaten` | `host.test.ts` „alte Spielstände ohne Statistik …“ |
 
 ## Nur von Hand geprüft (kein automatischer Test)
 

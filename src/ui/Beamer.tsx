@@ -1,26 +1,30 @@
 // Beameransicht: großes Brett, Würfel, Punktestand, Log, Timer. Zeigt nie Handkarten.
 import type { JSX } from 'preact';
-import { useState } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import type { Sitzung } from '../netz/sitzung';
 import { Brett } from './Brett';
 import { HilfeDialog } from './Dialoge';
 import { EndeDialog, Menue } from './Spiel';
 import { useKartenFluege } from './animation';
-import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WurfAnzeige, statusText } from './Teile';
+import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WunschTafel, WurfAnzeige, statusText } from './Teile';
 import { useSitzung } from './hooks';
+import { neueBauten } from './verlauf';
 
 export function BeamerAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVerlassen: () => void }): JSX.Element {
   const z = useSitzung(sitzung);
   const sicht = z.sicht!;
   const [dialog, setDialog] = useState<null | 'hilfe' | 'menue'>(null);
+  // Nur neu berechnen, wenn sich der Verlauf ändert: Die Spielebene des Bretts ist memoisiert.
+  const markiert = useMemo(() => neueBauten(sicht), [sicht.log.at(-1)?.nr, sicht.zugNr]);
   const status = statusText(sicht);
   const sonderbau = sicht.phase === 'sonderbau';
   useKartenFluege(sicht);
   return (
     <div class="beamer">
       <main class="brettbereich">
-        <Brett sicht={sicht} />
+        <Brett sicht={sicht} markiert={markiert} />
         <AngebotsListe sicht={sicht} />
+        <WunschTafel sicht={sicht} />
       </main>
       <aside class="seite">
         <div class="kopf">

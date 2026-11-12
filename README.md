@@ -6,6 +6,7 @@ Browser-Mehrspielerspiel für 3–6 Personen nach dem Prinzip „siedeln, handel
 - **Peer-to-Peer über WebRTC** (PeerJS). Der Browser des Hosts rechnet das ganze Spiel, alle anderen treten mit einem Raumcode bei.
 - Standardregeln plus 5–6-Spieler-Erweiterung mit **Sonderbauphase**, Zugtimer, Beameransicht.
 - **Bankübersicht** (Karten je Rohstoff in der Bank und bei den Spielern), **Chat**, gut sichtbare **Handelsangebote**, **Würfel in der Brettmitte** und **Kartenflug-Animationen** zwischen Hand, Bank und Mitspielern.
+- **Rangliste der Feigen Sippe** auf der Startseite und in der Lobby, **Statistik und Titel** am Spielende, **Suche/Biete-Wunschtafel**, Hinweise auf **unmögliche Handel**, hervorgehobene **neue Bauten** und **Ertragsfelder**, Verlauf nach Zügen.
 
 Namen, Grafiken und Texte sind eigene; nur die Spielmechanik orientiert sich am bekannten Brettspiel.
 
@@ -53,6 +54,12 @@ Im Spiel:
 - **Bank:** In der Seitenleiste steht je Rohstoff oben die Zahl in der Bank, unten die Zahl bei allen Spielern zusammen. Daneben der Stapel der Entwicklungskarten.
 - **Handel:** Angebote an dich erscheinen groß oben über dem Brett, aus deiner Sicht formuliert („Du bekommst … / Du gibst …“), mit Annehmen, Ablehnen und Gegenangebot. Wer ein Angebot macht, sieht pro Mitspieler, ob er noch überlegt oder abgelehnt hat.
 - **Chat:** Reiter „Chat“ neben dem Verlauf (auch in der Lobby). Ungelesene Nachrichten zeigt eine Zahl am Reiter. Höchstens 5 Nachrichten in 10 Sekunden pro Person, 200 Zeichen je Nachricht. Der Beamer liest nur mit.
+- **Mitspieler im Blick:** Baut jemand eine Siedlung oder Stadt, kauft eine Entwicklungskarte oder versetzt den Räuber, gibt es einen Hinweis mit eigenem Ton. Neue Bauten der anderen fallen animiert aufs Brett und bleiben bis zum Ende deines nächsten Zugs markiert. Gewürfelte Felder leuchten auf, die Rohstoffe fliegen von dort zu den Spielern.
+- **Verlauf:** nach Zügen gruppiert, mit Symbolen. Ein Klick auf einen Bau oder Räuberzug zeigt die Stelle auf dem Brett. Unter jedem Spieler zeigt ein dünner Balken den Weg bis zum Sieg.
+- **Suche/Biete:** Über „📣 Suche/Biete“ zeigt jede:r allen, welche Rohstoffe gesucht und geboten werden. Die Wünsche stehen unten links auf dem Brett (auch am Beamer), bis man sie ändert.
+- **Unmögliche Handel:** Im Handelsdialog steht unter einem Rohstoff „sonst hat niemand …“, wenn alle übrigen Karten in der Bank und deiner Hand liegen; ein Angebot dafür lässt sich nicht senden (die Bank geht weiter). Mitspieler ohne Karten sind als Empfänger ausgegraut.
+- **Spielende:** Podest, Punkteverlauf, Würfelverteilung (gewürfelt gegen erwartet), Würfelertrag, Tauschvorgänge, Diebstähle und Titel (Räuberbaron, Handelsfürst, Pechvogel). Der Host startet mit „Revanche“ wieder die Lobby.
+- **Rangliste:** Jede online zu Ende gespielte Partie zählt (Hot-Seat nicht). Es gibt keinen Server: Jedes Gerät speichert die Liste selbst, beim Verbinden gleichen Host und Mitspieler sie ab. Spieler werden am Namen erkannt (Groß-/Kleinschreibung egal) – also immer denselben Namen nehmen.
 - **Animationen:** Karten fliegen zwischen Hand, Bank und Mitspielern. Bei fremden Spielern ist nur dann zu sehen, welcher Rohstoff fliegt, wenn die Bank beteiligt ist (das ist ohnehin öffentlich). Diebstahl und Handel zwischen zwei anderen zeigen verdeckte Karten. Mit „Bewegung reduzieren“ im Betriebssystem sind alle Animationen aus.
 
 Tipps:
@@ -163,7 +170,7 @@ Grundsätze:
 Regeln, die im Auftrag offen waren, sind so umgesetzt:
 
 1. **Anfänger-Layout**: eigenes festes, ausgeglichenes Layout (per fester Suche erzeugt), nicht die Originalaufstellung.
-2. **Varianten** in der Lobby: Siegpunkte 8/10/12 und „Freundlicher Räuber“ (Spieler mit höchstens 2 sichtbaren Punkten sind geschützt). Standard: 10 Punkte, Räuber normal.
+2. **Varianten** in der Lobby: Siegpunkte 8/10/12, „Freundlicher Räuber“ (Spieler mit höchstens 2 sichtbaren Punkten sind geschützt), Sonderbauphase an/aus (nur 5–6 Spieler) und Abwerfen bei einer 7 ab mehr als 7 oder mehr als 9 Karten. Standard: 10 Punkte, Räuber normal, Sonderbauphase an, mehr als 7.
 3. **Sonderbauphase**: Wer mit seiner Hand nichts bauen oder kaufen kann, wird automatisch übersprungen. Das spart viel Zeit, verrät aber minimal etwas über die Hand. Abschaltbar über `sonderbauAutoSkip` in der Spielkonfiguration (`src/engine/typen.ts`).
 4. **Sieg in der Sonderbauphase** gibt es nicht: Wer dort 10 Punkte erreicht, gewinnt zu Beginn seines eigenen Zugs.
 5. **Bestehlen**: Gibt es nur einen möglichen Betroffenen, wird direkt gezogen; bei mehreren wählt der Spieler.

@@ -1,6 +1,7 @@
 // Client (Spieler oder Beamer): sendet Absichten an den Host und zeigt dessen gefilterte Sicht an.
 import type { Brett, Sicht } from '../engine';
 import { ENDE_TEXT, PROTOKOLL_VERSION, pruefeHostNachricht, type ClientNachricht } from './protokoll';
+import { partien, uebernimm } from './rangliste';
 import { Beobachtbar, STANDARD_EINSTELLUNGEN, type Absicht, type Sitzung, type SitzungsZustand } from './sitzung';
 import { loesche, peerId, type Profil } from './speicher';
 import { TransportFehler, type ClientTransport, type Verbindung } from './verbindung';
@@ -75,6 +76,7 @@ export class Client extends Beobachtbar implements Sitzung {
         this.plane(1500);
       };
       this.sende({ v: PROTOKOLL_VERSION, t: 'hallo', token: this.token, name: this.meinProfil.name, farbe: this.meinProfil.farbe, rolle: this.rolle });
+      this.sende({ v: PROTOKOLL_VERSION, t: 'rangliste', partien: partien() });
     } catch (e) {
       if (this.beendet) return;
       const text = e instanceof TransportFehler ? e.message : 'Verbindung fehlgeschlagen.';
@@ -131,6 +133,9 @@ export class Client extends Beobachtbar implements Sitzung {
       }
       case 'chat':
         return this.setze({ chat: n.eintraege });
+      case 'rangliste':
+        uebernimm(n.partien);
+        return;
       case 'abgelehnt':
         return this.setze({ hinweis: { nr: ++this.hinweisNr, text: n.grund } });
       case 'ende':
