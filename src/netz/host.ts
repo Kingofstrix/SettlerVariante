@@ -61,6 +61,7 @@ export function pruefeHostDaten(d: unknown): HostDaten | null {
         gluecksrad: x.spiel.gluecksrad ?? [],
         gluecksradNr: x.spiel.gluecksradNr ?? 0,
         gedreht: x.spiel.gedreht ?? [],
+        wurfStatistik: x.spiel.wurfStatistik ?? Array<number>(13).fill(0),
       }
     : null;
   return {

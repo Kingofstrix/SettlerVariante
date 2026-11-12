@@ -311,6 +311,7 @@ input:focus-visible {
 /* Seitenleiste */
 
 .seite {
+  position: relative;
   grid-row: 1 / span 2;
   grid-column: 2;
   background: var(--rahmen);
@@ -1570,6 +1571,28 @@ summary {
   display: flex;
   flex-direction: column;
 }
+/* Statistik braucht Höhe: Der Bereich klappt nach oben auf und liegt über Bank und Baumenü. */
+.verlauf-chat.aufgeklappt {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 9px;
+  z-index: 6;
+  filter: drop-shadow(0 -6px 16px rgba(0, 0, 0, 0.35));
+  animation: aufklappen 0.18s ease-out;
+}
+@keyframes aufklappen {
+  from {
+    transform: translateY(14px);
+    opacity: 0.4;
+  }
+}
+.verlauf-chat.aufgeklappt .statistik {
+  flex: none;
+}
+.verlauf-chat.aufgeklappt .statistik-diagramm {
+  max-height: 34vh;
+}
 .reiter {
   display: flex;
   gap: 2px;
@@ -1651,6 +1674,118 @@ summary {
   height: 220px;
   border-radius: var(--rund-m);
   background: var(--mulde);
+}
+
+/* ---------- Würfelstatistik ---------- */
+
+.statistik {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--tafel);
+  border-radius: var(--rund-m);
+  padding: 6px 8px;
+}
+.statistik-kopf {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  min-height: 2.6em;
+  line-height: 1.3;
+}
+.statistik-diagramm {
+  width: 100%;
+  height: auto;
+  display: block;
+  max-height: 130px;
+}
+.st-achse {
+  stroke: var(--linie-kante);
+  stroke-width: 1;
+}
+.st-balken {
+  fill: var(--rahmen-hell);
+}
+.st-slot.sieben .st-balken {
+  fill: var(--raeuber);
+}
+.st-slot.letzte .st-balken {
+  fill: var(--gold);
+}
+.st-slot.aktiv .st-balken {
+  fill: var(--rahmen);
+  stroke: var(--gold);
+  stroke-width: 2;
+}
+.st-slot.letzte.aktiv .st-balken {
+  fill: var(--gold);
+  stroke: var(--rahmen);
+}
+.st-erwartet {
+  stroke: var(--tinte);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+.st-slot rect:focus {
+  outline: none;
+}
+.st-slot rect:focus-visible {
+  outline: 2px solid var(--gold);
+}
+.statistik-tabelle {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.2;
+  border-top: 1px solid var(--linie);
+  padding-top: 2px;
+}
+.statistik-tabelle b {
+  font-family: Georgia, serif;
+  display: block;
+}
+.statistik-tabelle b.rot {
+  color: var(--zahl-rot);
+}
+.statistik-tabelle span {
+  color: var(--tinte-leise);
+  font-variant-numeric: tabular-nums;
+}
+.statistik-tabelle .aktiv {
+  background: var(--gold-blass);
+  border-radius: 5px;
+}
+.statistik-tabelle .letzte b {
+  text-decoration: underline 2px;
+  text-underline-offset: 2px;
+}
+.statistik-legende {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--tinte-leise);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.statistik-legende i {
+  display: inline-block;
+  width: 12px;
+  height: 10px;
+}
+.lg-balken {
+  background: var(--rahmen-hell);
+  border-radius: 2px;
+}
+.lg-erwartet {
+  border-top: 2px dashed var(--tinte);
+  height: 0 !important;
+}
+.lg-letzte {
+  background: var(--gold);
+  border-radius: 2px;
 }
 
 /* ---------- Beamer: neue Teile größer ---------- */

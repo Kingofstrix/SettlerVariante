@@ -209,6 +209,8 @@ export interface GameState {
   gluecksrad: GluecksradDreh[];
   gluecksradNr: number;
   gedreht: number[];
+  /** Wie oft jede Augensumme in dieser Partie gefallen ist (Index = Summe, 2–12). */
+  wurfStatistik: number[];
 }
 
 // Aktionen (Intentionen). "spieler" setzt immer der Host anhand der Verbindung.
