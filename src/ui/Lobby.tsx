@@ -4,6 +4,7 @@ import { useState } from 'preact/hooks';
 import { FARBEN, farbHex, type Einstellungen, type Sitzung } from '../netz/sitzung';
 import { ChatBox } from './Chat';
 import { HilfeDialog } from './Dialoge';
+import { Kartenwahl } from './Kartenwahl';
 import { useSitzung } from './hooks';
 
 function Auswahl<T extends string | number | boolean>({
@@ -71,6 +72,8 @@ export function Lobby({ sitzung, onVerlassen }: { sitzung: Sitzung; onVerlassen:
       </header>
 
       {!z.online && <div class="banner warn">{z.meldung ?? 'Keine Verbindung …'} Wenn es nicht klappt: alle in einen Handy-Hotspot.</div>}
+
+      <Kartenwahl sitze={z.sitze} meinSitz={z.meinSitz} onStimme={ich ? (karte) => sitzung.stimme(karte) : undefined} />
 
       <div class="lobby-spalten">
         <section class="tafel">
@@ -152,7 +155,7 @@ export function Lobby({ sitzung, onVerlassen }: { sitzung: Sitzung; onVerlassen:
           <div class="einst">
             <label>Maximale Spielerzahl</label>
             <Auswahl wert={e.maxSpieler} aus={!h} onChange={(w) => setze({ maxSpieler: w })} optionen={[[3, '3'], [4, '4'], [5, '5'], [6, '6']]} />
-            <label>Brett</label>
+            <label data-tip="Gilt nur für die Karte „Klassik“. Die anderen Karten werden immer zufällig belegt.">Verteilung auf Klassik</label>
             <Auswahl wert={e.layout} aus={!h} onChange={(w) => setze({ layout: w })} optionen={[['anfaenger', 'Anfänger (fest)'], ['zufall', 'Zufall']]} />
             <label>Siegpunkte</label>
             <Auswahl wert={e.siegpunkte} aus={!h} onChange={(w) => setze({ siegpunkte: w })} optionen={[[8, '8 (kurz)'], [10, '10'], [12, '12']]} />

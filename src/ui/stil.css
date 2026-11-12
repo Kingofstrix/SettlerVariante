@@ -1212,6 +1212,134 @@ summary {
   color: var(--tinte-leise);
 }
 
+/* ---------- Kartenwahl (Lobby) ---------- */
+
+.karten-reihe {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.kartenkarte {
+  font: inherit;
+  color: var(--tinte);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 8px 10px;
+  background: var(--weiss);
+  border: 2px solid var(--linie);
+  border-radius: var(--rund-l);
+  box-shadow: 0 var(--kante) 0 var(--linie-kante);
+  transition: transform 0.08s, box-shadow 0.08s, border-color 0.12s, background 0.12s;
+}
+button.kartenkarte {
+  cursor: pointer;
+}
+button.kartenkarte:hover {
+  border-color: var(--gold-kante);
+  transform: translateY(-1px);
+  box-shadow: 0 calc(var(--kante) + 1px) 0 var(--linie-kante);
+}
+button.kartenkarte:active {
+  transform: translateY(var(--kante));
+  box-shadow: none;
+}
+button.kartenkarte:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+.kartenkarte.gewaehlt {
+  background: var(--gold-blass);
+  border-color: var(--gold-kante);
+  box-shadow: 0 0 0 2px var(--gold), 0 var(--kante) 0 2px var(--gold-kante);
+}
+.karten-vorschau {
+  position: relative;
+  display: block;
+  height: 132px;
+  border-radius: var(--rund-m);
+  background: radial-gradient(ellipse at 50% 40%, var(--meer-1), var(--meer-2));
+}
+.kartenbild {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.kb-saum {
+  fill: var(--flachwasser);
+  stroke: var(--flachwasser);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+  opacity: 0.28;
+}
+.kb-sockel {
+  fill: var(--sand-kante);
+  stroke: var(--sand-kante);
+  stroke-width: 0.3;
+  stroke-linejoin: round;
+}
+.kb-strand {
+  fill: var(--sand);
+  stroke: var(--sand);
+  stroke-width: 0.3;
+  stroke-linejoin: round;
+}
+.kb-kante {
+  fill: var(--g-weide-k);
+}
+.kb-feld {
+  fill: var(--g-weide-2);
+}
+.karten-marke {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 11.5px;
+  font-weight: 800;
+  background: var(--gold);
+  color: var(--tinte);
+  border-radius: 999px;
+  padding: 1px 9px;
+  box-shadow: 0 2px 0 var(--gold-kante);
+}
+.karten-name {
+  font-family: var(--schrift-titel);
+  font-size: 17px;
+  margin-top: 4px;
+}
+.karten-text {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--tinte-leise);
+  flex: 1;
+}
+.karten-stimmen {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  margin-top: 4px;
+}
+.karten-zahl {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tinte-leise);
+  margin-left: 2px;
+}
+.kartenkarte.gewaehlt .karten-zahl {
+  color: var(--tinte);
+}
+.karten-stand {
+  margin-bottom: 0;
+}
+/* Niedrige Bildschirme: kleinere Vorschau, damit „Spiel starten“ näher rückt */
+@media (max-height: 800px) {
+  .karten-vorschau {
+    height: 100px;
+  }
+}
+
 /* ---------- Handelsangebote (oben mittig über dem Brett) ---------- */
 
 .angebote {

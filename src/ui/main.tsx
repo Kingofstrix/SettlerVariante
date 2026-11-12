@@ -144,11 +144,12 @@ function App(): JSX.Element {
               // Dieser Browser wird Host; sitzt sein Token nicht am Tisch, schaut er nur zu.
               hostFortsetzen({ ...daten, hostToken: meinToken() });
             },
-            lokal: (n) =>
+            lokal: (n, karte) =>
               setSitzung(
                 new LokalSitzung(
                   FARBEN.slice(0, n).map((f) => ({ name: f.name, farbe: f.id })),
                   STANDARD_EINSTELLUNGEN,
+                  karte,
                 ),
               ),
           }}
