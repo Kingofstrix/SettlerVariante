@@ -1,7 +1,7 @@
 // Gefilterte Sicht: Was ein bestimmter Spieler (oder der Beamer) sehen darf.
 import { amZug, gesamtPunkte } from './engine';
 import { oeffentlichePunkte, strassenLaenge } from './regeln';
-import { summe, type Bewegung, type EntwKarte, type GameState, type LogEintrag, type Rohstoffe, type Spieler } from './typen';
+import { summe, type Bewegung, type EntwKarte, type GameState, type LogEintrag, type Rohstoffe, type Spieler, type Statistik } from './typen';
 
 export interface SpielerSicht extends Omit<Spieler, 'hand' | 'entw'> {
   /** Nur beim eigenen Spieler gefüllt, sonst null. */
@@ -20,29 +20,33 @@ export interface SichtBewegung extends Omit<Bewegung, 'r'> {
 }
 
 export interface Sicht
-  extends Omit<GameState, 'spieler' | 'stapel' | 'rngState' | 'seed' | 'log' | 'gespielteEntw' | 'bewegungen'> {
+  extends Omit<GameState, 'spieler' | 'stapel' | 'rngState' | 'seed' | 'log' | 'gespielteEntw' | 'bewegungen' | 'statistik'> {
   bewegungen: SichtBewegung[];
   /** Eigener Spielerindex; null beim Beamer. */
   ich: number | null;
   spieler: SpielerSicht[];
   stapelAnzahl: number;
-  log: { nr: number; text: string }[];
+  log: SichtLog[];
   /** Eigene Gesamtpunkte inkl. Siegpunktkarten; null beim Beamer. */
   eigenePunkte: number | null;
   /** Wer gerade handeln muss. */
   amZug: number[];
   /** Bei Spielende: Endstand mit aufgedeckten Siegpunktkarten. */
   endstand: number[] | null;
+  /** Erst bei Spielende sichtbar (enthält verdeckte Siegpunkte). */
+  statistik: Statistik | null;
 }
 
-function logFuer(l: LogEintrag, ich: number | null): { nr: number; text: string } {
-  if (l.geheim && ich !== null && l.geheim.fuer.includes(ich)) return { nr: l.nr, text: l.geheim.text };
-  return { nr: l.nr, text: l.text };
+export type SichtLog = Omit<LogEintrag, 'geheim'>;
+
+function logFuer(l: LogEintrag, ich: number | null): SichtLog {
+  const { geheim, ...rest } = l;
+  return geheim && ich !== null && geheim.fuer.includes(ich) ? { ...rest, text: geheim.text } : rest;
 }
 
 /** ich = Spielerindex oder null (Beamer/Zuschauer: sieht keine Handkarten). */
 export function sichtFuer(s: GameState, ich: number | null): Sicht {
-  const { spieler, stapel, rngState: _r, seed: _s, log, gespielteEntw: _g, bewegungen, ...rest } = s;
+  const { spieler, stapel, rngState: _r, seed: _s, log, gespielteEntw: _g, bewegungen, statistik, ...rest } = s;
   void _r, _s, _g;
   return {
     ...rest,
@@ -64,5 +68,6 @@ export function sichtFuer(s: GameState, ich: number | null): Sicht {
     eigenePunkte: ich === null ? null : gesamtPunkte(s, ich),
     amZug: amZug(s),
     endstand: s.phase === 'ende' ? spieler.map((p) => gesamtPunkte(s, p.id)) : null,
+    statistik: s.phase === 'ende' ? statistik : null,
   };
 }

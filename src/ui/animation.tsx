@@ -112,12 +112,18 @@ export function useKartenFluege(sicht: Sicht): void {
     if (neu.length === 0) return;
     let start = Math.max(0, ruheBis - Date.now());
     if (vorher.wurf !== wurf && sicht.wurf) start = Math.max(start, 450); // seitliche Würfel erst ausrollen lassen
-    let i = 0;
-    for (const b of neu) {
-      const von = ziel(b.von, b.r, sicht.ich);
-      const nach = ziel(b.nach, b.r, sicht.ich);
-      if (!von || !nach || von === nach) continue;
-      for (let k = 0; k < Math.min(b.n, MAX_JE_BEWEGUNG) && i < MAX_GESAMT; k++, i++) fliege(von, nach, b.r, start + i * ABSTAND);
-    }
+    // Nicht synchron rendern: Preact führt ausstehende Effekte mitten im nächsten Render aus, und ein
+    // verschachteltes render() würde dann die Hooks der gerade rendernden Komponente durcheinanderbringen.
+    queueMicrotask(() => {
+      let i = 0;
+      for (const b of neu) {
+        // Würfelertrag: vom Feld auf dem Brett statt von der Bank
+        const feld = b.hex !== undefined ? document.querySelector(`.brett [data-hex="${b.hex}"] circle`) : null;
+        const von = sichtbar(feld) ? feld : ziel(b.von, b.r, sicht.ich);
+        const nach = ziel(b.nach, b.r, sicht.ich);
+        if (!von || !nach || von === nach) continue;
+        for (let k = 0; k < Math.min(b.n, MAX_JE_BEWEGUNG) && i < MAX_GESAMT; k++, i++) fliege(von, nach, b.r, start + i * ABSTAND);
+      }
+    });
   }, [maxNr, sicht.ich]);
 }

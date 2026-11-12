@@ -5,7 +5,7 @@
 // Wiederkehrende Formen stehen einmal in <defs> und werden per <use> eingesetzt. Keine SVG-Filter.
 import type { JSX } from 'preact';
 import { useMemo, useRef } from 'preact/hooks';
-import { punkte, type Brett as BrettDaten, type Sicht } from '../engine';
+import { punkte, type Brett as BrettDaten, type Ort, type Sicht } from '../engine';
 import { farbHex } from '../netz/sitzung';
 import { GelaendeDefs } from './Gelaende';
 import { rohstoffForm } from './Icons';
@@ -26,6 +26,10 @@ interface Props {
   onEcke?: (id: number) => void;
   onKante?: (id: number) => void;
   onHex?: (id: number) => void;
+  /** Neue Bauten anderer (seit meinem letzten Zug): markiert. */
+  markiert?: { ecken: Set<number>; kanten: Set<number> };
+  /** Kurz hervorgehobene Stelle (Klick im Verlauf). */
+  fokus?: Ort | null;
 }
 
 const S = 100; // Pixel je Brett-Einheit
@@ -154,7 +158,7 @@ function Grundebene({ b, box }: { b: BrettDaten; box: string }): JSX.Element {
   );
 }
 
-export function Brett({ sicht, ziele = KEINE_ZIELE, meineFarbe, onEcke, onKante, onHex }: Props): JSX.Element {
+export function Brett({ sicht, ziele = KEINE_ZIELE, meineFarbe, onEcke, onKante, onHex, markiert, fokus }: Props): JSX.Element {
   const b = sicht.brett;
   const box = useMemo(() => viewBox(b), [b]);
   // Gleicher VNode bei gleichem Brett: Preact überspringt die Grundebene dann komplett.
@@ -209,7 +213,7 @@ export function Brett({ sicht, ziele = KEINE_ZIELE, meineFarbe, onEcke, onKante,
           b.hexes
             .filter((h) => h.zahl === wurf && h.id !== sicht.raeuber)
             .map((h) => (
-              <g class="ertrag" transform={`translate(${h.x * S},${h.y * S})`} key={`${sicht.zugNr}-${h.id}`}>
+              <g class="ertrag" data-hex={h.id} transform={`translate(${h.x * S},${h.y * S})`} key={`${sicht.zugNr}-${h.id}`}>
                 <use href="#b-hex" class="ertrag-licht" />
                 <circle cy={CHIP_Y} r="35" class="ertrag-ring" />
               </g>
@@ -227,7 +231,14 @@ export function Brett({ sicht, ziele = KEINE_ZIELE, meineFarbe, onEcke, onKante,
           const k = b.kanten[Number(kid)];
           const [ax, ay] = ecke(k.a);
           const [bx, by] = ecke(k.b);
-          return <use class="strasse" href={`#b-str-${richtung(ax, ay, bx, by)}`} x={(ax + bx) / 2} y={(ay + by) / 2} style={{ color: farbe(sp) }} />;
+          const strasse = <use class="strasse" href={`#b-str-${richtung(ax, ay, bx, by)}`} x={(ax + bx) / 2} y={(ay + by) / 2} style={{ color: farbe(sp) }} />;
+          if (!markiert?.kanten.has(Number(kid))) return strasse;
+          return (
+            <g class="neu-strasse" key={`k${kid}`}>
+              <line x1={ax + (bx - ax) * 0.17} y1={ay + (by - ay) * 0.17} x2={bx - (bx - ax) * 0.17} y2={by - (by - ay) * 0.17} class="markierung" />
+              {strasse}
+            </g>
+          );
         })}
 
         {/* Straßen-Ziele */}
@@ -247,8 +258,28 @@ export function Brett({ sicht, ziele = KEINE_ZIELE, meineFarbe, onEcke, onKante,
         {/* Gebäude */}
         {Object.entries(sicht.gebaeude).map(([eid, g]) => {
           const [x, y] = ecke(Number(eid));
-          return <use class="gebaeude" href={g.typ === 'stadt' ? '#b-stadt' : '#b-siedlung'} x={x} y={y} style={{ color: farbe(g.spieler) }} />;
+          const neu = markiert?.ecken.has(Number(eid));
+          return (
+            <g key={`e${eid}-${g.typ}`}>
+              {neu && <circle class="markierung" cx={x} cy={y} r="40" style={{ stroke: farbe(g.spieler) }} />}
+              <use class={`gebaeude ${neu ? 'neu' : ''}`} href={g.typ === 'stadt' ? '#b-stadt' : '#b-siedlung'} x={x} y={y} style={{ color: farbe(g.spieler) }} />
+            </g>
+          );
         })}
+
+        {/* Fokus aus dem Verlauf */}
+        {fokus &&
+          (() => {
+            let x: number, y: number;
+            if (fokus.ecke !== undefined) [x, y] = ecke(fokus.ecke);
+            else if (fokus.kante !== undefined) {
+              const k = b.kanten[fokus.kante];
+              x = (ecke(k.a)[0] + ecke(k.b)[0]) / 2;
+              y = (ecke(k.a)[1] + ecke(k.b)[1]) / 2;
+            } else if (fokus.hex !== undefined) [x, y] = [b.hexes[fokus.hex].x * S, b.hexes[fokus.hex].y * S];
+            else return null;
+            return <circle class="fokus" key={`f${x},${y}`} cx={x} cy={y} r={fokus.hex !== undefined ? 70 : 42} />;
+          })()}
 
         {/* Ecken-Ziele (Siedlung/Stadt) mit Vorschau beim Überfahren */}
         {ziele.ecken.map((eid) => {
@@ -270,7 +301,7 @@ export function Brett({ sicht, ziele = KEINE_ZIELE, meineFarbe, onEcke, onKante,
         </g>
       </svg>
     );
-  }, [sicht, ziele, meineFarbe, b, box]);
+  }, [sicht, ziele, meineFarbe, b, box, markiert, fokus]);
 
   return (
     <div class="brett-stapel">

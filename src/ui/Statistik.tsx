@@ -1,112 +1,99 @@
-// Würfelstatistik der laufenden Partie: Häufigkeit je Augensumme, mit Erwartungswert als Vergleich.
+// Statistik am Spielende: Würfelverteilung, Punkteverlauf, Kennzahlen je Spieler.
 import type { JSX } from 'preact';
-import { useState } from 'preact/hooks';
-import type { Sicht } from '../engine';
+import type { Sicht, Statistik } from '../engine';
+import { farbHex } from '../netz/sitzung';
 
-const SUMMEN = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+/** Möglichkeiten je Augensumme mit zwei Würfeln (von 36). */
+const WEGE = [0, 0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1];
 
-/** Wahrscheinlichkeit einer Augensumme mit zwei Würfeln */
-export function wahrscheinlichkeit(summe: number): number {
-  return (6 - Math.abs(7 - summe)) / 36;
-}
-
-function zahl(x: number): string {
-  return x.toLocaleString('de-DE', { maximumFractionDigits: 1 });
-}
-
-// Diagramm-Maße im viewBox-Koordinatensystem
-const B = 320;
-const H = 132;
-const OBEN = 10;
-const UNTEN = 4;
-const SLOT = B / SUMMEN.length;
-const BALKEN = SLOT - 2; // 2px Abstand zwischen den Balken
-
-export function WuerfelStatistik({ sicht }: { sicht: Sicht }): JSX.Element {
-  const zaehler = sicht.wurfStatistik ?? [];
-  const werte = SUMMEN.map((s) => zaehler[s] ?? 0);
-  const gesamt = werte.reduce((a, b) => a + b, 0);
-  const erwartet = SUMMEN.map((s) => gesamt * wahrscheinlichkeit(s));
-  const max = Math.max(1, ...werte, ...erwartet) * 1.08;
-  const y = (v: number): number => OBEN + (H - OBEN - UNTEN) * (1 - v / max);
-  const [aktiv, setAktiv] = useState<number | null>(null);
-  const letzte = sicht.wurf ? sicht.wurf[0] + sicht.wurf[1] : null;
-
-  let kopf: string;
-  if (gesamt === 0) kopf = 'Noch nicht gewürfelt.';
-  else if (aktiv !== null) {
-    const s = SUMMEN[aktiv];
-    kopf = `${s}: ${werte[aktiv]}× gefallen (${zahl((werte[aktiv] / gesamt) * 100)} %) · erwartet ${zahl(erwartet[aktiv])}× (${zahl(wahrscheinlichkeit(s) * 100)} %)`;
-  } else {
-    const spitze = Math.max(...werte);
-    const oft = SUMMEN.filter((_, i) => werte[i] === spitze);
-    kopf = `${gesamt} Würfe · am häufigsten: ${oft.join(', ')} (${spitze}×)`;
-  }
-
+export function WuerfelVerteilung({ st }: { st: Statistik }): JSX.Element {
+  const gesamt = st.wuerfe.reduce((a, b) => a + b, 0);
+  const summen = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const max = Math.max(1, ...summen.map((z) => Math.max(st.wuerfe[z], (gesamt * WEGE[z]) / 36)));
+  const [B, H, unten] = [330, 120, 18];
+  const breite = B / summen.length;
+  const y = (n: number): number => H - unten - (n / max) * (H - unten - 6);
   return (
-    <div class="statistik">
-      <p class="statistik-kopf" aria-live="polite">
-        {kopf}
-      </p>
-      <svg
-        class="statistik-diagramm"
-        viewBox={`0 0 ${B} ${H}`}
-        role="img"
-        aria-label={`Würfelstatistik: ${SUMMEN.map((s, i) => `${s}: ${werte[i]}`).join(', ')}`}
-        onMouseLeave={() => setAktiv(null)}
-      >
-        {/* Grundlinie */}
-        <line x1="0" x2={B} y1={H - UNTEN} y2={H - UNTEN} class="st-achse" />
-        {SUMMEN.map((s, i) => {
-          const x = i * SLOT + 1;
-          const top = y(werte[i]);
-          const hoehe = H - UNTEN - top;
-          const r = Math.min(4, hoehe / 2, BALKEN / 2);
-          // Balken: oben abgerundet, unten gerade auf der Grundlinie
-          const pfad =
-            hoehe > 0
-              ? `M${x},${H - UNTEN} V${top + r} Q${x},${top} ${x + r},${top} H${x + BALKEN - r} Q${x + BALKEN},${top} ${x + BALKEN},${top + r} V${H - UNTEN} Z`
-              : '';
-          const ey = y(erwartet[i]);
+    <figure class="diagramm">
+      <figcaption>
+        Würfelverteilung <small>({gesamt} Würfe · Balken: gewürfelt, Strich: erwartet)</small>
+      </figcaption>
+      <svg viewBox={`0 0 ${B} ${H}`} role="img" aria-label="Würfelverteilung">
+        <line x1="0" x2={B} y1={H - unten} y2={H - unten} class="achse" />
+        {summen.map((z, i) => {
+          const x = i * breite;
+          const erwartet = (gesamt * WEGE[z]) / 36;
           return (
-            <g class={`st-slot ${aktiv === i ? 'aktiv' : ''} ${s === 7 ? 'sieben' : ''} ${s === letzte ? 'letzte' : ''}`}>
-              {pfad && <path d={pfad} class="st-balken" />}
-              {gesamt > 0 && <line x1={x + 3} x2={x + BALKEN - 3} y1={ey} y2={ey} class="st-erwartet" />}
-              {/* Trefferfläche größer als der Balken */}
-              <rect
-                x={i * SLOT}
-                y="0"
-                width={SLOT}
-                height={H}
-                fill="transparent"
-                onMouseEnter={() => setAktiv(i)}
-                onFocus={() => setAktiv(i)}
-                onBlur={() => setAktiv(null)}
-                tabIndex={0}
-                aria-label={`${s}: ${werte[i]}-mal, erwartet ${zahl(erwartet[i])}`}
-              />
+            <g class="balken-gruppe">
+              <title>{`${z}: ${st.wuerfe[z]}× gewürfelt, erwartet ${erwartet.toFixed(1)}×`}</title>
+              <rect x={x} y="0" width={breite} height={H} fill="transparent" />
+              {st.wuerfe[z] > 0 && (
+                <rect class={`balken ${z === 7 ? 'sieben' : ''}`} x={x + 3} y={y(st.wuerfe[z])} width={breite - 6} height={H - unten - y(st.wuerfe[z])} rx="3" />
+              )}
+              <line class="erwartet" x1={x + 2} x2={x + breite - 2} y1={y(erwartet)} y2={y(erwartet)} />
+              <text x={x + breite / 2} y={H - 4} text-anchor="middle" class="achsentext">
+                {z}
+              </text>
             </g>
           );
         })}
       </svg>
-      {/* Tabellenzeile: Augensumme und Anzahl unter jedem Balken */}
-      <div class="statistik-tabelle" aria-hidden="true">
-        {SUMMEN.map((s, i) => (
-          <div class={`${aktiv === i ? 'aktiv' : ''} ${s === letzte ? 'letzte' : ''}`}>
-            <b class={s === 6 || s === 8 ? 'rot' : ''}>{s}</b>
-            <span>{werte[i]}</span>
-          </div>
+    </figure>
+  );
+}
+
+export function PunkteVerlauf({ sicht, st }: { sicht: Sicht; st: Statistik }): JSX.Element | null {
+  const reihen = st.punkte;
+  if (reihen.length < 2) return null;
+  const [B, H, links, rechts, oben, unten] = [330, 150, 22, 70, 8, 16];
+  const maxP = Math.max(sicht.config.siegpunkte, ...reihen.flat());
+  const x = (i: number): number => links + (i / (reihen.length - 1)) * (B - links - rechts);
+  const y = (p: number): number => oben + (1 - p / maxP) * (H - oben - unten);
+  // Namen am Linienende, ohne sich zu überlappen
+  const ende = sicht.spieler.map((p) => ({ id: p.id, y: y(reihen.at(-1)![p.id]) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ende.length; i++) ende[i].y = Math.max(ende[i].y, ende[i - 1].y + 12);
+  const schritt = (B - links - rechts) / (reihen.length - 1);
+  return (
+    <figure class="diagramm">
+      <figcaption>
+        Siegpunkte im Verlauf <small>(nach jedem Zug, inkl. verdeckter Punkte)</small>
+      </figcaption>
+      <svg viewBox={`0 0 ${B} ${H}`} role="img" aria-label="Siegpunkte im Verlauf">
+        {[0, Math.round(maxP / 2), maxP].map((p) => (
+          <g>
+            <line x1={links} x2={B - rechts} y1={y(p)} y2={y(p)} class="raster" />
+            <text x={links - 5} y={y(p) + 4} text-anchor="end" class="achsentext">
+              {p}
+            </text>
+          </g>
         ))}
-      </div>
-      <p class="statistik-legende">
-        <i class="lg-balken" /> gewürfelt <i class="lg-erwartet" /> erwartet bei {gesamt} Würfen
-        {letzte !== null && (
-          <>
-            {' '}
-            · <i class="lg-letzte" /> letzter Wurf
-          </>
-        )}
-      </p>
-    </div>
+        {sicht.spieler.map((p) => {
+          const pkt = reihen.map((r, i) => `${x(i)},${y(r[p.id])}`).join(' ');
+          return (
+            <g>
+              <polyline points={pkt} class="linie-rand" />
+              <polyline points={pkt} class="linie" stroke={farbHex(p.farbe)} />
+            </g>
+          );
+        })}
+        {ende.map((e) => {
+          const p = sicht.spieler[e.id];
+          return (
+            <g>
+              <circle cx={B - rechts + 8} cy={e.y} r="4.5" fill={farbHex(p.farbe)} stroke-width="1.5" style={{ stroke: 'var(--umriss)' }} />
+              <text x={B - rechts + 16} y={e.y + 4} class="linientext">
+                {p.name}
+              </text>
+            </g>
+          );
+        })}
+        {/* Hover: je Zug alle Punktestände */}
+        {reihen.map((r, i) => (
+          <rect x={x(i) - schritt / 2} y={oben} width={schritt} height={H - oben - unten} fill="transparent">
+            <title>{`${i === 0 ? 'Nach der Gründung' : `Nach Zug ${i}`}\n${sicht.spieler.map((p) => `${p.name}: ${r[p.id]}`).join('\n')}`}</title>
+          </rect>
+        ))}
+      </svg>
+    </figure>
   );
 }

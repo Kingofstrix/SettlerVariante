@@ -27,6 +27,8 @@ export interface Einstellungen {
   zugZeit: number; // Sekunden; 0 = aus
   sonderbauZeit: number;
   abwerfZeit: number;
+  sonderbauphase: boolean;
+  abwurfGrenze: number; // 7 oder 9
 }
 
 export const STANDARD_EINSTELLUNGEN: Einstellungen = {
@@ -38,6 +40,8 @@ export const STANDARD_EINSTELLUNGEN: Einstellungen = {
   zugZeit: 90,
   sonderbauZeit: 20,
   abwerfZeit: 30,
+  sonderbauphase: true,
+  abwurfGrenze: 7,
 };
 
 export type TimerArt = 'zug' | 'sonderbau' | 'abwerfen';

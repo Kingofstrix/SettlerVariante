@@ -99,6 +99,8 @@ export interface Spieler {
   siedlungenUebrig: number;
   staedteUebrig: number;
   strassenUebrig: number;
+  /** Öffentliche Wunschliste: was der Spieler sucht und was er dafür bietet. */
+  wunsch: { suche: Rohstoff[]; biete: Rohstoff[] };
 }
 
 export type Phase =
@@ -118,6 +120,8 @@ export interface SpielConfig {
   siegpunkte: number; // 8, 10 oder 12
   freundlicherRaeuber: boolean;
   sonderbauAutoSkip: boolean; // Spieler, die nichts bauen können, in der Sonderbauphase überspringen
+  sonderbauphase: boolean; // Sonderbauphase bei 5–6 Spielern
+  abwurfGrenze: number; // bei einer 7 wirft ab, wer mehr Karten hat (7 oder 9)
   /** Las-Vegas-Variante: Bei einer 7 darf man statt abzuwerfen am Glücksrad drehen. */
   gluecksrad: boolean;
 }
@@ -130,6 +134,8 @@ export const STANDARD_CONFIG: SpielConfig = {
   siegpunkte: 10,
   freundlicherRaeuber: false,
   sonderbauAutoSkip: true,
+  sonderbauphase: true,
+  abwurfGrenze: 7,
   gluecksrad: false,
 };
 
@@ -149,6 +155,15 @@ export interface Bewegung {
   nach: number | null;
   r: Rohstoff | 'entw';
   n: number;
+  /** Beim Würfelertrag: das Feld, von dem die Karten kommen. */
+  hex?: number;
+}
+
+/** Stelle auf dem Brett, auf die sich ein Logeintrag bezieht. */
+export interface Ort {
+  ecke?: number;
+  kante?: number;
+  hex?: number;
 }
 
 /** Ergebnis eines Drehs am Glücksrad (öffentlich, für die Animation). */
@@ -167,8 +182,26 @@ export interface GluecksradDreh {
 export interface LogEintrag {
   nr: number;
   text: string;
+  /** Zugnummer, in der der Eintrag entstand (0 = Gründung). Fehlt in alten Spielständen. */
+  zug?: number;
+  /** Spieler, der gehandelt hat. */
+  wer?: number;
+  ort?: Ort;
   // Optionaler Zusatztext, den nur bestimmte Spieler sehen (z. B. welche Karte gestohlen wurde)
   geheim?: { fuer: number[]; text: string };
+}
+
+export interface Statistik {
+  /** Anzahl Würfe je Augensumme (Index 0–12). */
+  wuerfe: number[];
+  /** Je Spieler: Rohstoffkarten aus Würfelerträgen. */
+  ertrag: number[];
+  /** Je Spieler: Tauschvorgänge mit Mitspielern und der Bank. */
+  handel: number[];
+  /** Je Spieler: gestohlene Karten (als Dieb). */
+  diebstahl: number[];
+  /** Siegpunkte aller Spieler (inkl. verdeckter) nach der Gründung und nach jedem Zug. */
+  punkte: number[][];
 }
 
 export interface GameState {
@@ -205,11 +238,12 @@ export interface GameState {
   /** Die letzten Kartenbewegungen (für Animationen), mit fortlaufender Nummer. */
   bewegungen: Bewegung[];
   bewegungNr: number;
+  statistik: Statistik;
   /** Die letzten Drehs am Glücksrad und wer bei der aktuellen 7 schon gedreht hat. */
   gluecksrad: GluecksradDreh[];
   gluecksradNr: number;
   gedreht: number[];
-  /** Wie oft jede Augensumme in dieser Partie gefallen ist (Index = Summe, 2–12). */
+  /** Wie oft jede Augensumme gefallen ist (Index = Summe, 2–12). Anders als statistik.wuerfe immer öffentlich (Reiter „Statistik“). */
   wurfStatistik: number[];
 }
 
@@ -235,6 +269,7 @@ export type Aktion =
   | { typ: 'HANDEL_ZURUECKZIEHEN'; spieler: number; angebot: number }
   | { typ: 'ZUG_BEENDEN'; spieler: number }
   | { typ: 'SONDERBAU_FERTIG'; spieler: number }
+  | { typ: 'WUNSCH_SETZEN'; spieler: number; suche: Rohstoff[]; biete: Rohstoff[] }
   // Vom Host bei abgelaufenem Timer ausgelöst: führt genau einen Standardschritt aus.
   | { typ: 'ZEIT_ABGELAUFEN'; spieler: number };
 

@@ -27,7 +27,7 @@ function piep(frequenz: number, start: number, dauer: number, lautstaerke = 0.05
   o.stop(t + dauer + 0.02);
 }
 
-export function ton(art: 'dran' | 'wuerfel' | 'bau' | 'fehler' | 'handel' | 'tick' | 'jackpot' | 'verloren'): void {
+export function ton(art: 'dran' | 'wuerfel' | 'bau' | 'fehler' | 'handel' | 'fremd' | 'tick' | 'jackpot' | 'verloren'): void {
   if (!an) return;
   try {
     ctx ??= new AudioContext();
@@ -45,6 +45,10 @@ export function ton(art: 'dran' | 'wuerfel' | 'bau' | 'fehler' | 'handel' | 'tic
         break;
       case 'handel':
         piep(520, 0, 0.12);
+        break;
+      case 'fremd': // ein Mitspieler baut, kauft oder versetzt den Räuber
+        piep(392, 0, 0.1, 0.035, 'triangle');
+        piep(294, 0.09, 0.14, 0.035, 'triangle');
         break;
       case 'fehler':
         piep(160, 0, 0.2, 0.04, 'sawtooth');

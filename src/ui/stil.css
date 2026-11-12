@@ -413,7 +413,7 @@ input:focus-visible {
 .spielerzeile {
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr) 34px;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   column-gap: 8px;
   align-items: center;
   padding: 3px 6px;
@@ -579,7 +579,7 @@ input:focus-visible {
 .log p {
   margin: 0 0 3px;
 }
-.log p:last-child {
+.log-zug:last-child p:last-child {
   font-weight: 700;
 }
 
@@ -1819,6 +1819,299 @@ summary {
 }
 .beamer .angebot .rchip {
   font-size: 1em;
+}
+
+/* ---------- Spielerzeile: Fortschritt bis zum Sieg ---------- */
+
+.sfortschritt {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  height: 4px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background: var(--linie);
+  overflow: hidden;
+}
+.sfortschritt i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(29, 26, 22, 0.25);
+  transition: width 0.4s;
+}
+
+/* ---------- Verlauf nach Zügen ---------- */
+
+.log-zug h4 {
+  margin: 6px 0 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tinte-leise);
+  border-bottom: 1px solid var(--linie);
+}
+.log-zug:first-child h4 {
+  margin-top: 0;
+}
+.log-symbol {
+  display: inline-block;
+  width: 1.4em;
+  text-align: center;
+}
+.log p .punkt {
+  width: 9px;
+  height: 9px;
+}
+.log p.klickbar {
+  cursor: pointer;
+  border-radius: 5px;
+}
+.log p.klickbar:hover {
+  background: var(--mulde);
+}
+
+/* ---------- Handel / Wunsch ---------- */
+
+.handel-matrix small.niemand {
+  display: block;
+  color: var(--warn);
+  font-weight: 700;
+}
+.wunsch-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+}
+.wunsch-zeile b {
+  width: 80px;
+}
+
+/* ---------- Wunschtafel (unten links auf dem Brett) ---------- */
+
+.wunschtafel {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 5;
+  max-width: min(420px, 45%);
+  background: var(--tafel);
+  border: 2px solid var(--gold);
+  border-radius: 12px;
+  box-shadow: var(--schatten);
+  padding: 7px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: auf 0.2s ease-out;
+}
+.wunschtafel-titel {
+  font-size: 13px;
+}
+.wunschtafel-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 14px;
+}
+.wunschtafel-name {
+  font-weight: 700;
+  min-width: 70px;
+}
+.beamer .wunschtafel {
+  font-size: clamp(14px, 1.2vw, 24px);
+}
+
+/* ---------- Rangliste ---------- */
+
+.start-rangliste {
+  max-width: 760px;
+  margin: 16px auto 0;
+}
+.rangliste h2 small {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--tinte-leise);
+  font-weight: 400;
+}
+.rang-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.rang-tabelle th,
+.rang-tabelle td {
+  text-align: left;
+  padding: 5px 6px;
+  border-top: 1px solid var(--linie);
+  white-space: nowrap;
+}
+.rang-tabelle td:last-child {
+  white-space: normal;
+}
+.rang-tabelle th {
+  font-size: 12px;
+  color: var(--tinte-leise);
+  border-top: none;
+}
+.rang-tabelle tbody tr:first-child td {
+  background: var(--gold-blass);
+}
+.rang-tabelle .marke {
+  margin-right: 4px;
+}
+
+/* ---------- Siegerbildschirm ---------- */
+
+.podest {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 4px 0 14px;
+}
+.podest-platz {
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+.podest-name {
+  font-size: 18px;
+}
+.podest-punkte {
+  color: var(--tinte-leise);
+  font-size: 13px;
+}
+.podest-stufe {
+  width: 100%;
+  margin-top: 4px;
+  border-radius: 10px 10px 0 0;
+  background: var(--sf);
+  border: 2px solid var(--umriss);
+  border-bottom: none;
+  font-family: var(--schrift-zahl);
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--weiss);
+  /* Umriss: auch auf dem weißen Sockel lesbar */
+  -webkit-text-stroke: 2px var(--umriss);
+  paint-order: stroke fill;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.p1 .podest-stufe {
+  height: 96px;
+}
+.p2 .podest-stufe {
+  height: 68px;
+}
+.p3 .podest-stufe {
+  height: 48px;
+}
+.endstand th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tinte-leise);
+  text-align: left;
+  padding: 0 6px 3px;
+}
+.endstand td:nth-child(n + 3) {
+  font-variant-numeric: tabular-nums;
+}
+.diagramme {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+.diagramm {
+  margin: 0;
+}
+.diagramm figcaption {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.diagramm figcaption small {
+  font-weight: 400;
+  color: var(--tinte-leise);
+}
+.diagramm svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.diagramm .achse {
+  stroke: var(--tinte-leise);
+  stroke-width: 1;
+}
+.diagramm .raster {
+  stroke: var(--linie);
+  stroke-width: 1;
+}
+.diagramm .achsentext {
+  font-size: 10px;
+  fill: var(--tinte-leise);
+}
+.diagramm .balken {
+  fill: var(--meer-2);
+}
+.diagramm .balken.sieben {
+  fill: var(--raeuber);
+}
+.diagramm .balken-gruppe:hover .balken {
+  fill: var(--meer-3);
+}
+.diagramm .erwartet {
+  stroke: var(--hinweis);
+  stroke-width: 2;
+  stroke-dasharray: 3 2;
+}
+.diagramm .linie,
+.diagramm .linie-rand {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.diagramm .linie {
+  stroke-width: 2;
+}
+.diagramm .linie-rand {
+  stroke: var(--umriss);
+  stroke-width: 3.5;
+  stroke-opacity: 0.55;
+}
+.diagramm .linientext {
+  font-size: 10.5px;
+  fill: var(--tinte);
+}
+.konfetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 95;
+  overflow: hidden;
+}
+.konfetti i {
+  position: absolute;
+  top: -20px;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  animation: konfetti-fall linear forwards;
+}
+@keyframes konfetti-fall {
+  to {
+    transform: translateY(105vh) rotate(720deg);
+    opacity: 0.2;
+  }
 }
 
 /* ---------- Las Vegas: Glücksrad ---------- */

@@ -26,9 +26,11 @@ import {
   type EntwTyp,
   type Ergebnis,
   type GameState,
+  type LogEintrag,
   type Rohstoff,
   type Rohstoffe,
   type SpielConfig,
+  type Statistik,
 } from './typen';
 
 const LOG_MAX = 300;
@@ -88,6 +90,7 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
       siedlungenUebrig: 5,
       staedteUebrig: 4,
       strassenUebrig: 15,
+      wunsch: { suche: [], biete: [] },
     })),
     aktiv: 0,
     zugNr: 0,
@@ -109,6 +112,7 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
     logNr: 0,
     bewegungen: [],
     bewegungNr: 0,
+    statistik: leereStatistik(n),
     gluecksrad: [],
     gluecksradNr: 0,
     gedreht: [],
@@ -121,9 +125,14 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
 
 // ---------- Hilfsfunktionen ----------
 
-function log(s: GameState, text: string, geheim?: { fuer: number[]; text: string }): void {
+export function leereStatistik(spielerzahl: number): Statistik {
+  const null_ = (): number[] => Array<number>(spielerzahl).fill(0);
+  return { wuerfe: Array<number>(13).fill(0), ertrag: null_(), handel: null_(), diebstahl: null_(), punkte: [] };
+}
+
+function log(s: GameState, text: string, extra: Pick<LogEintrag, 'geheim' | 'wer' | 'ort'> = {}): void {
   s.logNr++;
-  s.log.push(geheim ? { nr: s.logNr, text, geheim } : { nr: s.logNr, text });
+  s.log.push({ nr: s.logNr, text, zug: s.zugNr, ...extra });
   if (s.log.length > LOG_MAX) s.log.splice(0, s.log.length - LOG_MAX);
 }
 
@@ -147,6 +156,13 @@ function klon(s: GameState): GameState {
     sonderbau: s.sonderbau ? { ...s.sonderbau } : null,
     log: s.log.slice(),
     bewegungen: s.bewegungen.slice(),
+    statistik: {
+      wuerfe: s.statistik.wuerfe.slice(),
+      ertrag: s.statistik.ertrag.slice(),
+      handel: s.statistik.handel.slice(),
+      diebstahl: s.statistik.diebstahl.slice(),
+      punkte: s.statistik.punkte.slice(),
+    },
     gluecksrad: s.gluecksrad.slice(),
     gedreht: s.gedreht.slice(),
     wurfStatistik: s.wurfStatistik.slice(),
@@ -181,13 +197,32 @@ export function gesamtPunkte(s: GameState, spieler: number): number {
   return oeffentlichePunkte(s, spieler) + s.spieler[spieler].entw.filter((k) => k.typ === 'siegpunkt').length;
 }
 
+/** Titel am Spielende. Ein Titel geht an alle mit dem Bestwert, aber nur, wenn nicht alle gleichauf liegen. */
+export const TITEL: { name: string; text: string; wert: (st: Statistik) => number[]; wenigste?: boolean }[] = [
+  { name: 'Räuberbaron', text: 'die meisten Karten gestohlen', wert: (st) => st.diebstahl },
+  { name: 'Handelsfürst', text: 'am häufigsten getauscht', wert: (st) => st.handel },
+  { name: 'Pechvogel', text: 'den wenigsten Würfelertrag bekommen', wert: (st) => st.ertrag, wenigste: true },
+];
+
+/** Titel je Spieler (Namen aus TITEL). */
+export function titel(st: Statistik): string[][] {
+  const aus = st.ertrag.map((): string[] => []);
+  for (const t of TITEL) {
+    const w = t.wert(st);
+    const best = t.wenigste ? Math.min(...w) : Math.max(...w);
+    if (w.every((x) => x === best) || (!t.wenigste && best === 0)) continue;
+    w.forEach((x, i) => x === best && aus[i].push(t.name));
+  }
+  return aus;
+}
+
 const BEWEGUNGEN_MAX = 40;
 
 /** Hält eine Kartenbewegung fest (nur für die Anzeige; ändert keine Karten). */
-function bewege(s: GameState, von: number | null, nach: number | null, r: Rohstoff | 'entw', n: number): void {
+function bewege(s: GameState, von: number | null, nach: number | null, r: Rohstoff | 'entw', n: number, hex?: number): void {
   if (n <= 0) return;
   s.bewegungNr++;
-  s.bewegungen.push({ nr: s.bewegungNr, von, nach, r, n });
+  s.bewegungen.push(hex === undefined ? { nr: s.bewegungNr, von, nach, r, n } : { nr: s.bewegungNr, von, nach, r, n, hex });
   if (s.bewegungen.length > BEWEGUNGEN_MAX) s.bewegungen.splice(0, s.bewegungen.length - BEWEGUNGEN_MAX);
 }
 
@@ -229,7 +264,7 @@ function aktualisiereStrasse(s: GameState): void {
   }
   if (neu !== vorher) {
     s.laengsteStrasse = neu;
-    if (neu !== null) log(s, `${s.spieler[neu].name} hat jetzt die Längste Handelsstraße (${max}).`);
+    if (neu !== null) log(s, `${s.spieler[neu].name} hat jetzt die Längste Handelsstraße (${max}).`, { wer: neu });
     else if (vorher !== null) log(s, `${s.spieler[vorher].name} verliert die Längste Handelsstraße – niemand hält sie.`);
   }
 }
@@ -239,19 +274,23 @@ function aktualisiereMacht(s: GameState, spieler: number): void {
   const halter = s.groessteMacht;
   if (n >= 3 && halter !== spieler && (halter === null || n > s.spieler[halter].gespielteRitter)) {
     s.groessteMacht = spieler;
-    log(s, `${s.spieler[spieler].name} hat jetzt die Größte Rittermacht (${n}).`);
+    log(s, `${s.spieler[spieler].name} hat jetzt die Größte Rittermacht (${n}).`, { wer: spieler });
   }
 }
 
 function verteile(s: GameState, zahl: number): string {
   const ertrag = s.spieler.map(() => leereRohstoffe());
+  const quellen: { hex: number; spieler: number; r: Rohstoff; n: number }[] = [];
   for (const h of s.brett.hexes) {
     if (h.zahl !== zahl || h.id === s.raeuber) continue;
     const r = GELAENDE_ROHSTOFF[h.gelaende];
     if (!r) continue;
     for (const e of h.ecken) {
       const g = s.gebaeude[e];
-      if (g) ertrag[g.spieler][r] += g.typ === 'stadt' ? 2 : 1;
+      if (!g) continue;
+      const n = g.typ === 'stadt' ? 2 : 1;
+      ertrag[g.spieler][r] += n;
+      quellen.push({ hex: h.id, spieler: g.spieler, r, n });
     }
   }
   const knapp: string[] = [];
@@ -264,14 +303,21 @@ function verteile(s: GameState, zahl: number): string {
     else for (const i of berechtigte) ertrag[i][r] = 0;
     knapp.push(ROHSTOFF_NAME[r]);
   }
+  // Kartenbewegungen je Feld (für die Animation), gekürzt auf den tatsächlichen Ertrag
+  const rest = ertrag.map((e) => ({ ...e }));
+  for (const q of quellen) {
+    const n = Math.min(q.n, rest[q.spieler][q.r]);
+    rest[q.spieler][q.r] -= n;
+    bewege(s, null, q.spieler, q.r, n, q.hex);
+  }
   const teile: string[] = [];
   ertrag.forEach((e, i) => {
     if (summe(e) === 0) return;
     for (const r of ROHSTOFFE) {
       s.spieler[i].hand[r] += e[r];
       s.bank[r] -= e[r];
-      bewege(s, null, i, r, e[r]);
     }
+    s.statistik.ertrag[i] += summe(e);
     teile.push(`${s.spieler[i].name} erhält ${formatRohstoffe(e)}`);
   });
   let text = teile.length ? teile.join('; ') : 'niemand erhält etwas';
@@ -287,9 +333,13 @@ function stehle(s: GameState, dieb: number, opfer: number): void {
   hand[r]--;
   s.spieler[dieb].hand[r]++;
   bewege(s, opfer, dieb, r, 1);
+  s.statistik.diebstahl[dieb]++;
   log(s, `${s.spieler[dieb].name} stiehlt eine Karte von ${s.spieler[opfer].name}.`, {
-    fuer: [dieb, opfer],
-    text: `${s.spieler[dieb].name} stiehlt 1× ${ROHSTOFF_NAME[r]} von ${s.spieler[opfer].name}.`,
+    wer: dieb,
+    geheim: {
+      fuer: [dieb, opfer],
+      text: `${s.spieler[dieb].name} stiehlt 1× ${ROHSTOFF_NAME[r]} von ${s.spieler[opfer].name}.`,
+    },
   });
 }
 
@@ -303,7 +353,12 @@ export function kannEtwasBauen(s: GameState, spieler: number): boolean {
   return false;
 }
 
+function merkePunkte(s: GameState): void {
+  s.statistik.punkte.push(s.spieler.map((p) => gesamtPunkte(s, p.id)));
+}
+
 function naechsterZug(s: GameState): void {
+  merkePunkte(s);
   s.aktiv = (s.aktiv + 1) % s.spieler.length;
   s.zugNr++;
   s.phase = 'wuerfeln';
@@ -345,6 +400,7 @@ function setupWeiter(s: GameState): void {
     s.phase = 'wuerfeln';
     s.aktiv = 0;
     s.zugNr = 1;
+    merkePunkte(s);
     log(s, `Die Gründungsphase ist beendet. ${s.spieler[0].name} beginnt.`);
   }
 }
@@ -355,7 +411,8 @@ function pruefeSieg(s: GameState): void {
     s.phase = 'ende';
     s.gewinner = s.aktiv;
     s.angebote = [];
-    log(s, `🏆 ${s.spieler[s.aktiv].name} gewinnt mit ${gesamtPunkte(s, s.aktiv)} Siegpunkten!`);
+    merkePunkte(s);
+    log(s, `🏆 ${s.spieler[s.aktiv].name} gewinnt mit ${gesamtPunkte(s, s.aktiv)} Siegpunkten!`, { wer: s.aktiv });
   }
 }
 
@@ -380,20 +437,21 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       const w: [number, number] = [zufallInt(s, 6) + 1, zufallInt(s, 6) + 1];
       s.wurf = w;
       const zahl = w[0] + w[1];
+      s.statistik.wuerfe[zahl]++;
       s.wurfStatistik[zahl]++;
       if (zahl === 7) {
         s.abwerfen = {};
         s.gedreht = [];
         for (const q of s.spieler) {
           const n = summe(q.hand);
-          if (n > 7) s.abwerfen[q.id] = Math.floor(n / 2);
+          if (n > s.config.abwurfGrenze) s.abwerfen[q.id] = Math.floor(n / 2);
         }
         const namen = Object.keys(s.abwerfen).map((i) => s.spieler[Number(i)].name);
-        log(s, `${p.name} würfelt 7${namen.length ? ` – ${namen.join(', ')} ${namen.length > 1 ? 'müssen' : 'muss'} abwerfen` : ''}.`);
+        log(s, `${p.name} würfelt 7${namen.length ? ` – ${namen.join(', ')} ${namen.length > 1 ? 'müssen' : 'muss'} abwerfen` : ''}.`, { wer: a.spieler });
         s.nachRaeuber = 'aktion';
         s.phase = namen.length ? 'abwerfen' : 'raeuber';
       } else {
-        log(s, `${p.name} würfelt ${zahl} – ${verteile(s, zahl)}.`);
+        log(s, `${p.name} würfelt ${zahl} – ${verteile(s, zahl)}.`, { wer: a.spieler });
         s.phase = 'aktion';
       }
       return null;
@@ -407,7 +465,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       if (!kannZahlen(p.hand, karten)) return 'So viele Karten hast du nicht.';
       zahle(s, a.spieler, karten);
       delete s.abwerfen[a.spieler];
-      log(s, `${p.name} wirft ${soll} Karten ab.`);
+      log(s, `${p.name} wirft ${soll} Karten ab.`, { wer: a.spieler });
       if (Object.keys(s.abwerfen).length === 0) s.phase = 'raeuber';
       return null;
     }
@@ -445,7 +503,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       if (!gueltigeRaeuberHexes(s, a.spieler).includes(a.hex)) return 'Dorthin darf der Räuber nicht.';
       s.raeuber = a.hex;
       const h = s.brett.hexes[a.hex];
-      log(s, `${p.name} versetzt den Räuber${h.zahl ? ` auf die ${h.zahl}` : ' in die Wüste'}.`);
+      log(s, `${p.name} versetzt den Räuber${h.zahl ? ` auf die ${h.zahl}` : ' in die Wüste'}.`, { wer: a.spieler, ort: { hex: a.hex } });
       const kandidaten = anliegerGegner(s, a.spieler, a.hex).filter((i) => summe(s.spieler[i].hand) > 0);
       if (kandidaten.length > 1) {
         s.stehlenKandidaten = kandidaten;
@@ -473,7 +531,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
           return 'Die Straße muss an deine neue Siedlung grenzen.';
         s.strassen[a.kante] = a.spieler;
         p.strassenUebrig--;
-        log(s, `${p.name} baut eine Straße.`);
+        log(s, `${p.name} baut eine Straße.`, { wer: a.spieler, ort: { kante: a.kante } });
         setupWeiter(s);
         return null;
       }
@@ -487,7 +545,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       }
       s.strassen[a.kante] = a.spieler;
       p.strassenUebrig--;
-      log(s, `${p.name} baut eine Straße.`);
+      log(s, `${p.name} baut eine Straße.`, { wer: a.spieler, ort: { kante: a.kante } });
       if (s.freieStrassen > 0 && gueltigeStrassenKanten(s, a.spieler).length === 0) s.freieStrassen = 0;
       aktualisiereStrasse(s);
       return null;
@@ -514,7 +572,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
           for (const r of ROHSTOFFE) bewege(s, null, a.spieler, r, start[r]);
           text += ` und erhält ${formatRohstoffe(start)}`;
         }
-        log(s, text + '.');
+        log(s, text + '.', { wer: a.spieler, ort: { ecke: a.ecke } });
         s.setup = { ...s.setup, erwartet: 'strasse', letzteEcke: a.ecke };
         return null;
       }
@@ -525,7 +583,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       zahle(s, a.spieler, KOSTEN.siedlung);
       s.gebaeude[a.ecke] = { spieler: a.spieler, typ: 'siedlung' };
       p.siedlungenUebrig--;
-      log(s, `${p.name} baut eine Siedlung.`);
+      log(s, `${p.name} baut eine Siedlung.`, { wer: a.spieler, ort: { ecke: a.ecke } });
       aktualisiereStrasse(s); // eine Siedlung kann fremde Straßen unterbrechen
       return null;
     }
@@ -539,7 +597,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       s.gebaeude[a.ecke] = { spieler: a.spieler, typ: 'stadt' };
       p.staedteUebrig--;
       p.siedlungenUebrig++;
-      log(s, `${p.name} baut eine Stadt.`);
+      log(s, `${p.name} baut eine Stadt.`, { wer: a.spieler, ort: { ecke: a.ecke } });
       return null;
     }
 
@@ -552,8 +610,8 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       p.entw.push({ typ, gekauftInZug: s.zugNr });
       bewege(s, null, a.spieler, 'entw', 1);
       log(s, `${p.name} kauft eine Entwicklungskarte.`, {
-        fuer: [a.spieler],
-        text: `${p.name} kauft eine Entwicklungskarte: ${ENTW_NAME[typ]}.`,
+        wer: a.spieler,
+        geheim: { fuer: [a.spieler], text: `${p.name} kauft eine Entwicklungskarte: ${ENTW_NAME[typ]}.` },
       });
       return null;
     }
@@ -578,7 +636,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
         if (p.strassenUebrig <= 0 || gueltigeStrassenKanten(s, a.spieler).length === 0)
           return 'Du kannst gerade keine Straße bauen.';
         s.freieStrassen = Math.min(2, p.strassenUebrig);
-        log(s, `${p.name} spielt Straßenbau.`);
+        log(s, `${p.name} spielt Straßenbau.`, { wer: a.spieler });
       } else if (a.typ === 'ERFINDUNG_SPIELEN') {
         const r = a.rohstoffe;
         if (!Array.isArray(r) || r.length !== 2 || !istRohstoff(r[0]) || !istRohstoff(r[1])) return 'Wähle zwei Rohstoffe.';
@@ -591,7 +649,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
           p.hand[k]++;
           bewege(s, null, a.spieler, k, 1);
         }
-        log(s, `${p.name} spielt Erfindung und nimmt ${formatRohstoffe(bedarf)}.`);
+        log(s, `${p.name} spielt Erfindung und nimmt ${formatRohstoffe(bedarf)}.`, { wer: a.spieler });
       } else if (a.typ === 'MONOPOL_SPIELEN') {
         if (!istRohstoff(a.rohstoff)) return 'Wähle einen Rohstoff.';
         let n = 0;
@@ -602,10 +660,10 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
           q.hand[a.rohstoff] = 0;
         }
         p.hand[a.rohstoff] += n;
-        log(s, `${p.name} spielt Monopol auf ${ROHSTOFF_NAME[a.rohstoff]} und erhält ${n} Karten.`);
+        log(s, `${p.name} spielt Monopol auf ${ROHSTOFF_NAME[a.rohstoff]} und erhält ${n} Karten.`, { wer: a.spieler });
       } else {
         p.gespielteRitter++;
-        log(s, `${p.name} spielt einen Ritter.`);
+        log(s, `${p.name} spielt einen Ritter.`, { wer: a.spieler });
         aktualisiereMacht(s, a.spieler);
         s.nachRaeuber = s.phase === 'wuerfeln' ? 'wuerfeln' : 'aktion';
         s.phase = 'raeuber';
@@ -628,7 +686,8 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       p.hand[a.nimm]++;
       bewege(s, a.spieler, null, a.gib, v);
       bewege(s, null, a.spieler, a.nimm, 1);
-      log(s, `${p.name} tauscht ${v}× ${ROHSTOFF_NAME[a.gib]} gegen 1× ${ROHSTOFF_NAME[a.nimm]} (${v}:1).`);
+      s.statistik.handel[a.spieler]++;
+      log(s, `${p.name} tauscht ${v}× ${ROHSTOFF_NAME[a.gib]} gegen 1× ${ROHSTOFF_NAME[a.nimm]} (${v}:1).`, { wer: a.spieler });
       return null;
     }
 
@@ -652,7 +711,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       if (s.angebote.filter((o) => o.von === a.spieler).length >= 4) return 'Zu viele offene Angebote.';
       s.angebote.push({ id: s.naechsteAngebotId++, von: a.spieler, an, abgelehnt: [], gib, nimm });
       const ziel = an.length === s.spieler.length - 1 ? 'alle' : an.map((i) => s.spieler[i].name).join(', ');
-      log(s, `${p.name} bietet ${formatRohstoffe(gib)} für ${formatRohstoffe(nimm)} (an ${ziel}).`);
+      log(s, `${p.name} bietet ${formatRohstoffe(gib)} für ${formatRohstoffe(nimm)} (an ${ziel}).`, { wer: a.spieler });
       return null;
     }
 
@@ -672,7 +731,9 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
         bewege(s, a.spieler, o.von, r, o.nimm[r]);
       }
       s.angebote = s.angebote.filter((x) => x.id !== o.id);
-      log(s, `${von.name} und ${p.name} handeln: ${formatRohstoffe(o.gib)} gegen ${formatRohstoffe(o.nimm)}.`);
+      s.statistik.handel[o.von]++;
+      s.statistik.handel[a.spieler]++;
+      log(s, `${von.name} und ${p.name} handeln: ${formatRohstoffe(o.gib)} gegen ${formatRohstoffe(o.nimm)}.`, { wer: o.von });
       return null;
     }
 
@@ -696,7 +757,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       if (s.phase !== 'aktion' || !istAktiv) return UNGUELTIG;
       s.angebote = [];
       s.freieStrassen = 0;
-      if (s.spieler.length >= 5) {
+      if (s.spieler.length >= 5 && s.config.sonderbauphase) {
         // Sonderbauphase (nur 5–6 Spieler): alle anderen dürfen reihum bauen.
         const n = s.spieler.length;
         const reihenfolge = Array.from({ length: n - 1 }, (_, i) => (s.aktiv + 1 + i) % n);
@@ -711,6 +772,17 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       if (s.phase !== 'sonderbau' || s.sonderbau!.reihenfolge[s.sonderbau!.index] !== a.spieler) return UNGUELTIG;
       s.sonderbau!.index++;
       sonderbauWeiter(s);
+      return null;
+    }
+
+    case 'WUNSCH_SETZEN': {
+      const liste = (x: unknown): Rohstoff[] | null =>
+        Array.isArray(x) && x.every(istRohstoff) ? ROHSTOFFE.filter((r) => x.includes(r)) : null;
+      const suche = liste(a.suche);
+      const biete = liste(a.biete);
+      if (!suche || !biete) return 'Ungültiger Wunsch.';
+      if (suche.some((r) => biete.includes(r))) return 'Derselbe Rohstoff kann nicht gesucht und geboten werden.';
+      p.wunsch = { suche, biete };
       return null;
     }
 

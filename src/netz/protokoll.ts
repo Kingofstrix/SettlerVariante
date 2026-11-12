@@ -1,9 +1,10 @@
 // Versioniertes JSON-Protokoll zwischen Host und Clients. Jede eingehende Nachricht wird geprüft;
 // Unbekanntes oder Ungültiges wird verworfen (null), nie geworfen.
 import type { Brett, Sicht } from '../engine';
+import { pruefePartien, type Partie } from './rangliste';
 import { CHAT_MAX_LAENGE, type Absicht, type ChatEintrag, type Einstellungen, type SitzInfo, type TimerArt } from './sitzung';
 
-export const PROTOKOLL_VERSION = 3; // 2: Chat, Kartenbewegungen; 3: Glücksrad
+export const PROTOKOLL_VERSION = 4; // 2: Chat, Kartenbewegungen; 3: Glücksrad; 4: Rangliste, Wunschliste, Statistik
 
 // ---- Client -> Host ----
 export type ClientNachricht =
@@ -11,7 +12,8 @@ export type ClientNachricht =
   | { v: number; t: 'profil'; name: string; farbe: string }
   | { v: number; t: 'absicht'; nr: number; aktion: Absicht }
   | { v: number; t: 'pong'; id: number }
-  | { v: number; t: 'chat'; text: string };
+  | { v: number; t: 'chat'; text: string }
+  | { v: number; t: 'rangliste'; partien: Partie[] };
 
 // ---- Host -> Client ----
 export type SichtOhneBrett = Omit<Sicht, 'brett'> & { brett?: Brett };
@@ -31,12 +33,14 @@ export type HostNachricht =
   | { v: number; t: 'abgelehnt'; nr: number; grund: string }
   | { v: number; t: 'ping'; id: number }
   | { v: number; t: 'chat'; eintraege: ChatEintrag[] }
+  | { v: number; t: 'rangliste'; partien: Partie[] }
   | { v: number; t: 'ende'; grund: EndeGrund };
 
 const ABSICHT_TYPEN = new Set([
   'WUERFELN', 'ABWERFEN', 'GLUECKSRAD_DREHEN', 'RAEUBER_SETZEN', 'STEHLEN', 'STRASSE_BAUEN', 'SIEDLUNG_BAUEN', 'STADT_BAUEN',
   'ENTW_KAUFEN', 'RITTER_SPIELEN', 'STRASSENBAU_SPIELEN', 'ERFINDUNG_SPIELEN', 'MONOPOL_SPIELEN', 'BANKHANDEL',
   'HANDEL_ANBIETEN', 'HANDEL_ANNEHMEN', 'HANDEL_ABLEHNEN', 'HANDEL_ZURUECKZIEHEN', 'ZUG_BEENDEN', 'SONDERBAU_FERTIG',
+  'WUNSCH_SETZEN',
 ]);
 
 function istObjekt(x: unknown): x is Record<string, unknown> {
@@ -53,7 +57,8 @@ function zahl(x: unknown): x is number {
 export function pruefeClientNachricht(d: unknown): ClientNachricht | null {
   try {
     if (!istObjekt(d) || !zahl(d.v) || typeof d.t !== 'string') return null;
-    if (JSON.stringify(d).length > 4000) return null;
+    // Ranglisten dürfen größer sein (viele Partien), alles andere ist klein.
+    if (JSON.stringify(d).length > (d.t === 'rangliste' ? 300000 : 4000)) return null;
     switch (d.t) {
       case 'hallo':
         if (!text(d.token, 64) || d.token.length < 8 || !text(d.name, 40) || !text(d.farbe, 16)) return null;
@@ -72,6 +77,8 @@ export function pruefeClientNachricht(d: unknown): ClientNachricht | null {
       case 'chat':
         if (!text(d.text, CHAT_MAX_LAENGE * 2)) return null;
         return { v: d.v, t: 'chat', text: d.text };
+      case 'rangliste':
+        return { v: d.v, t: 'rangliste', partien: pruefePartien(d.partien) };
       default:
         return null;
     }
@@ -106,6 +113,8 @@ export function pruefeHostNachricht(d: unknown): HostNachricht | null {
             (e): e is ChatEintrag => istObjekt(e) && zahl(e.nr) && typeof e.name === 'string' && typeof e.text === 'string' && typeof e.farbe === 'string',
           ),
         };
+      case 'rangliste':
+        return { v: d.v, t: 'rangliste', partien: pruefePartien(d.partien) };
       case 'ende':
         if (typeof d.grund !== 'string') return null;
         return d as unknown as HostNachricht;

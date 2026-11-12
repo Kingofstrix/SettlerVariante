@@ -335,6 +335,50 @@ describe('Chat', () => {
   });
 });
 
+describe('Rangliste und neue Einstellungen', () => {
+  it('Einstellungen Sonderbauphase und Abwurfgrenze landen in der Spielkonfiguration', async () => {
+    const { h } = await raum(4, { sonderbauphase: false, abwurfGrenze: 9 });
+    h.host.starten();
+    expect(zustand(h).config).toMatchObject({ sonderbauphase: false, abwurfGrenze: 9 });
+  });
+  it('Spielende wird einmal eingetragen und an alle verteilt; fremde Partien werden zusammengeführt', async () => {
+    const { t, h, g } = await raum(2, { zugZeit: 60 });
+    h.host.starten();
+    let s = bis(h, (x) => x.phase !== 'setup');
+    s.config.siegpunkte = 2; // jeder hat nach der Gründung 2 Punkte: der nächste Schritt gewinnt
+    expect(h.host.debugSetze(JSON.stringify(s))).toBeNull();
+    s = bis(h, (x) => x.phase === 'ende');
+    const id = `${h.zustand.raumCode}-${s.seed}`;
+    const liste = g[0].letzte('rangliste')!.partien;
+    expect(liste.filter((p) => p.id === id).length).toBe(1);
+    const p = liste.find((x) => x.id === id)!;
+    expect(p.sieger).toBe(s.spieler[s.gewinner!].name);
+    expect(p.spieler.map((x) => x.name).sort()).toEqual(['Anna', 'Gast0', 'Gast1']);
+    // Ein Gast bringt eine Partie mit, die der Host nicht kennt: alle bekommen sie
+    const fremd = { id: 'ALT-1', datum: 1, sieger: 'Bea', spieler: ['Bea', 'Cem', 'Dora'].map((name) => ({ name, punkte: 5, titel: [] })) };
+    g[1].sende({ v: PROTOKOLL_VERSION, t: 'rangliste', partien: [fremd, { kaputt: true }] });
+    expect(g[0].letzte('rangliste')!.partien.map((x) => x.id)).toContain('ALT-1');
+    const neu = t.gast(tok(9), 'Beamer', 'beamer');
+    expect(neu.letzte('rangliste')!.partien.map((x) => x.id)).toEqual(expect.arrayContaining(['ALT-1', id]));
+    // Doppeltes wird nicht noch einmal verteilt
+    const vorher = g[0].empfangen.filter((n) => n.t === 'rangliste').length;
+    g[1].sende({ v: PROTOKOLL_VERSION, t: 'rangliste', partien: [fremd] });
+    expect(g[0].empfangen.filter((n) => n.t === 'rangliste').length).toBe(vorher);
+  });
+  it('alte Spielstände ohne Statistik und Wunschliste lassen sich laden', async () => {
+    const { h } = await raum(2);
+    h.host.starten();
+    const d = JSON.parse(h.host.exportieren());
+    delete d.spiel.statistik;
+    for (const p of d.spiel.spieler) delete p.wunsch;
+    delete d.spiel.config.abwurfGrenze;
+    const x = pruefeHostDaten(d)!;
+    expect(x.spiel!.statistik.wuerfe.length).toBe(13);
+    expect(x.spiel!.spieler[0].wunsch).toEqual({ suche: [], biete: [] });
+    expect(x.spiel!.config.abwurfGrenze).toBe(7);
+  });
+});
+
 describe('Glücksrad über den Host', () => {
   it('Lobby-Schalter landet in der Spielkonfiguration; nach dem Dreh startet die Abwurfzeit neu', async () => {
     const { h, g } = await raum(2, { zugZeit: 60, abwerfZeit: 30, gluecksrad: true });

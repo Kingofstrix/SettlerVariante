@@ -4,6 +4,7 @@ import { useState } from 'preact/hooks';
 import {
   ROHSTOFFE,
   ROHSTOFF_NAME,
+  kartenProRohstoff,
   leereRohstoffe,
   summe,
   tauschVerhaeltnis,
@@ -90,15 +91,28 @@ export function HandelDialog({
   const [gib, setGib] = useState<Rohstoffe>(vorlage ? { ...vorlage.nimm } : leereRohstoffe());
   const [nimm, setNimm] = useState<Rohstoffe>(vorlage ? { ...vorlage.gib } : leereRohstoffe());
   const andere = sicht.spieler.filter((p) => p.id !== ich);
-  const [an, setAn] = useState<number[]>(andere.map((p) => p.id));
+  // Wer keine Karten hat, kann nichts annehmen
+  const [an, setAn] = useState<number[]>(andere.filter((p) => p.handAnzahl > 0).map((p) => p.id));
+  // Öffentlich berechenbar: was alle anderen zusammen von einem Rohstoff haben (Gesamt − Bank − eigene Hand)
+  const gesamt = kartenProRohstoff(sicht.spieler.length);
+  const beiAnderen = (r: Rohstoff): number => gesamt - sicht.bank[r] - hand[r];
+  const unmoeglich = ROHSTOFFE.find((r) => nimm[r] > beiAnderen(r));
 
   const verh = Object.fromEntries(ROHSTOFFE.map((r) => [r, tauschVerhaeltnis(sicht, ich, r)])) as Rohstoffe;
   const ueberschneidung = ROHSTOFFE.some((r) => gib[r] > 0 && nimm[r] > 0);
   const zuViel = ROHSTOFFE.some((r) => gib[r] > hand[r]);
   let spielerGrund: string | null = null;
-  if (summe(gib) === 0 || summe(nimm) === 0) spielerGrund = 'Beide Seiten müssen etwas geben (keine Geschenke).';
+  // Zuerst: was rechnerisch niemand liefern kann (das weiß man, sobald man es auswählt)
+  if (unmoeglich)
+    spielerGrund =
+      beiAnderen(unmoeglich) === 0
+        ? `Niemand außer dir hat ${ROHSTOFF_NAME[unmoeglich]} – nur mit der Bank möglich.`
+        : `Die anderen haben zusammen nur ${beiAnderen(unmoeglich)}× ${ROHSTOFF_NAME[unmoeglich]}.`;
+  else if (summe(gib) === 0 || summe(nimm) === 0) spielerGrund = 'Beide Seiten müssen etwas geben (keine Geschenke).';
   else if (ueberschneidung) spielerGrund = 'Derselbe Rohstoff kann nicht auf beiden Seiten stehen.';
   else if (zuViel) spielerGrund = 'So viel hast du nicht.';
+  else if (!aktiv && sicht.spieler[sicht.aktiv].handAnzahl < summe(nimm))
+    spielerGrund = `${sicht.spieler[sicht.aktiv].name} hat nur ${sicht.spieler[sicht.aktiv].handAnzahl} Karte(n).`;
   else if (aktiv && an.length === 0) spielerGrund = 'Wähle mindestens einen Mitspieler.';
 
   // Bankhandel: jede Gabe muss ein Vielfaches des Verhältnisses sein
@@ -132,6 +146,7 @@ export function HandelDialog({
                 <small>
                   du hast {hand[r]} · Bank {verh[r]}:1
                 </small>
+                {beiAnderen(r) === 0 && <small class="niemand">sonst hat niemand {ROHSTOFF_NAME[r]}</small>}
               </th>
             ))}
           </tr>
@@ -159,12 +174,17 @@ export function HandelDialog({
       {aktiv ? (
         <div class="empfaenger">
           <span>Angebot an:</span>
-          <button class={`chip ${an.length === andere.length ? 'an' : ''}`} onClick={() => setAn(an.length === andere.length ? [] : andere.map((p) => p.id))}>
+          <button
+            class={`chip ${an.length === andere.length ? 'an' : ''}`}
+            onClick={() => setAn(an.length > 0 ? [] : andere.filter((p) => p.handAnzahl > 0).map((p) => p.id))}
+          >
             Alle
           </button>
           {andere.map((p) => (
             <button
               class={`chip ${an.includes(p.id) ? 'an' : ''}`}
+              disabled={p.handAnzahl === 0}
+              data-tip={p.handAnzahl === 0 ? `${p.name} hat keine Karten` : undefined}
               onClick={() => setAn(an.includes(p.id) ? an.filter((i) => i !== p.id) : [...an, p.id])}
             >
               <i class="punkt" style={{ background: farbHex(p.farbe) }} /> {p.name}
@@ -222,7 +242,7 @@ export function AbwerfenDialog({
   return (
     <Modal titel={gedreht ? `Pech am Glücksrad! Wirf ${soll} Karten ab` : `Eine 7! Wirf ${soll} Karten ab`} breit>
       <p class="hinweis">
-        {gedreht ? 'Das Glücksrad hat das Soll verdoppelt.' : 'Du hast mehr als 7 Karten und musst die Hälfte (abgerundet) abgeben.'}
+        {gedreht ? 'Das Glücksrad hat das Soll verdoppelt.' : `Du hast mehr als ${sicht.config.abwurfGrenze} Karten und musst die Hälfte (abgerundet) abgeben.`}
         {rest !== null && <b> Noch {rest} s – danach wird zufällig abgeworfen.</b>}
       </p>
       {kannDrehen && (
@@ -340,6 +360,40 @@ export function MonopolDialog({ aktion, onZu }: { aktion: (a: Absicht) => void; 
   );
 }
 
+/** Öffentliche Wunschliste: was ich suche und was ich biete. Jeder Klick gilt sofort. */
+export function WunschDialog({ sicht, aktion, onZu }: { sicht: Sicht; aktion: (a: Absicht) => void; onZu: () => void }): JSX.Element {
+  const w = sicht.spieler[sicht.ich!].wunsch;
+  const setze = (suche: Rohstoff[], biete: Rohstoff[]): void => aktion({ typ: 'WUNSCH_SETZEN', suche, biete });
+  const zeile = (titel: string, liste: Rohstoff[], andere: Rohstoff[], neu: (l: Rohstoff[], a: Rohstoff[]) => void): JSX.Element => (
+    <div class="wunsch-zeile">
+      <b>{titel}</b>
+      {ROHSTOFFE.map((r) => (
+        <button
+          class={`chip ${liste.includes(r) ? 'an' : ''}`}
+          onClick={() => (liste.includes(r) ? neu(liste.filter((x) => x !== r), andere) : neu([...liste, r], andere.filter((x) => x !== r)))}
+        >
+          <RohstoffIcon typ={r} groesse={20} /> {ROHSTOFF_NAME[r]}
+        </button>
+      ))}
+    </div>
+  );
+  return (
+    <Modal titel="Suche / Biete" onZu={onZu}>
+      <p class="hinweis">Alle sehen deinen Wunsch an deiner Spielerzeile, bis du ihn änderst.</p>
+      {zeile('Ich suche', w.suche, w.biete, (suche, biete) => setze(suche, biete))}
+      {zeile('Ich biete', w.biete, w.suche, (biete, suche) => setze(suche, biete))}
+      <footer>
+        <button class="knopf" disabled={w.suche.length + w.biete.length === 0} onClick={() => setze([], [])}>
+          Wunsch löschen
+        </button>
+        <button class="knopf haupt" onClick={onZu}>
+          Fertig
+        </button>
+      </footer>
+    </Modal>
+  );
+}
+
 // ---------- Regelhilfe ----------
 
 export function HilfeDialog({ onZu }: { onZu: () => void }): JSX.Element {
@@ -372,7 +426,7 @@ export function HilfeDialog({ onZu }: { onZu: () => void }): JSX.Element {
           </ol>
           <h3>Die 7</h3>
           <p>
-            Wer mehr als 7 Karten hält, gibt die Hälfte (abgerundet) ab. Danach versetzt du den Räuber auf ein anderes Feld und ziehst
+            Wer mehr als 7 Karten hält (Variante in der Lobby: mehr als 9), gibt die Hälfte (abgerundet) ab. Danach versetzt du den Räuber auf ein anderes Feld und ziehst
             einer dort angrenzenden Person eine zufällige Karte.
           </p>
         </section>
@@ -425,7 +479,7 @@ export function HilfeDialog({ onZu }: { onZu: () => void }): JSX.Element {
           <h3>Sonderbauphase (5–6 Spieler)</h3>
           <p>
             Nach jedem Zug dürfen alle anderen reihum bauen und Entwicklungskarten kaufen – aber nicht handeln und keine Karten
-            ausspielen. Wer nichts bauen kann, wird übersprungen.
+            ausspielen. Wer nichts bauen kann, wird übersprungen. Der Host kann die Sonderbauphase in der Lobby abschalten.
           </p>
         </section>
       </div>
