@@ -27,7 +27,7 @@ function piep(frequenz: number, start: number, dauer: number, lautstaerke = 0.05
   o.stop(t + dauer + 0.02);
 }
 
-export function ton(art: 'dran' | 'wuerfel' | 'bau' | 'fehler' | 'handel' | 'fremd'): void {
+export function ton(art: 'dran' | 'wuerfel' | 'bau' | 'fehler' | 'handel' | 'fremd' | 'tick' | 'jackpot' | 'verloren'): void {
   if (!an) return;
   try {
     ctx ??= new AudioContext();
@@ -52,6 +52,18 @@ export function ton(art: 'dran' | 'wuerfel' | 'bau' | 'fehler' | 'handel' | 'fre
         break;
       case 'fehler':
         piep(160, 0, 0.2, 0.04, 'sawtooth');
+        break;
+      case 'tick':
+        piep(1800, 0, 0.025, 0.025, 'square');
+        break;
+      case 'jackpot':
+        // Aufsteigendes Arpeggio, dann Glitzern
+        [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => piep(f, i * 0.07, 0.25, 0.05, 'triangle'));
+        [2093, 2637, 3136, 2637, 3136].forEach((f, i) => piep(f, 0.5 + i * 0.06, 0.12, 0.025));
+        break;
+      case 'verloren':
+        // Absteigendes „Wah-wah“
+        [392, 370, 349, 262].forEach((f, i) => piep(f, i * 0.28, i === 3 ? 0.7 : 0.26, 0.05, 'sawtooth'));
         break;
     }
   } catch {

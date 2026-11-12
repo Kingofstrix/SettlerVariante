@@ -1,6 +1,6 @@
 // Host-Logik ohne Netzwerk: gefälschter Transport, gefälschte Uhr.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pruefeInvarianten, type GameState } from '../src/engine';
+import { GLUECKSRAD_CHANCE, pruefeInvarianten, summe, zufall, type GameState } from '../src/engine';
 import { Host, pruefeHostDaten } from '../src/netz/host';
 import { PROTOKOLL_VERSION, pruefeClientNachricht, type HostNachricht } from '../src/netz/protokoll';
 import type { HostTransport, Verbindung } from '../src/netz/verbindung';
@@ -376,5 +376,38 @@ describe('Rangliste und neue Einstellungen', () => {
     expect(x.spiel!.statistik.wuerfe.length).toBe(13);
     expect(x.spiel!.spieler[0].wunsch).toEqual({ suche: [], biete: [] });
     expect(x.spiel!.config.abwurfGrenze).toBe(7);
+  });
+});
+
+describe('Glücksrad über den Host', () => {
+  it('Lobby-Schalter landet in der Spielkonfiguration; nach dem Dreh startet die Abwurfzeit neu', async () => {
+    const { h, g } = await raum(2, { zugZeit: 60, abwerfZeit: 30, gluecksrad: true });
+    h.host.starten();
+    let s = bis(h, (x) => x.phase === 'wuerfeln');
+    expect(s.config.gluecksrad).toBe(true);
+    // Eine 7 erzwingen, bei der ein Gast abwerfen muss
+    const gast = g.find((c) => c.letzte('spiel')!.sicht.ich !== null)!;
+    const ich = gast.letzte('spiel')!.sicht.ich!;
+    // RNG so wählen, dass der Dreh verliert (deterministischer Test)
+    let verlust = 1;
+    while (zufall({ rngState: verlust }) < GLUECKSRAD_CHANCE) verlust++;
+    s = { ...s, phase: 'abwerfen', abwerfen: { [ich]: 4 }, gedreht: [], rngState: verlust };
+    for (const r of ['holz', 'lehm', 'wolle']) s.spieler[ich].hand[r as 'holz'] += 3;
+    for (const r of ['holz', 'lehm', 'wolle']) s.bank[r as 'holz'] -= 3;
+    expect(h.host.debugSetze(JSON.stringify(s))).toBe(null);
+    vi.advanceTimersByTime(25000); // 25 von 30 s verbraucht
+    gast.absicht({ typ: 'GLUECKSRAD_DREHEN' });
+    const nach = zustand(h);
+    expect(nach.gluecksrad.at(-1)!.spieler).toBe(ich);
+    expect(nach.gluecksrad.at(-1)).toMatchObject({ gewonnen: false, nachher: 8 });
+    expect(nach.abwerfen[ich]).toBe(8);
+    // Verloren: volle 30 s für das neue Soll statt der restlichen 5 s
+    expect(gast.letzte('spiel')!.timer).toMatchObject({ art: 'abwerfen', restMs: 30000 });
+    vi.advanceTimersByTime(29000);
+    expect(zustand(h).phase).toBe('abwerfen');
+    vi.advanceTimersByTime(2000);
+    expect(zustand(h).phase).not.toBe('abwerfen');
+    expect(summe(zustand(h).spieler[ich].hand)).toBe(summe(s.spieler[ich].hand) - 8); // Zeitablauf wirft 8 zufällig ab
+    expect(pruefeInvarianten(zustand(h))).toEqual([]);
   });
 });

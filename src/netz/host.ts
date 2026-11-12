@@ -62,6 +62,10 @@ export function pruefeHostDaten(d: unknown): HostDaten | null {
         bewegungen: x.spiel.bewegungen ?? [],
         bewegungNr: x.spiel.bewegungNr ?? 0,
         statistik: x.spiel.statistik ?? leereStatistik(x.spiel.spieler.length),
+        gluecksrad: x.spiel.gluecksrad ?? [],
+        gluecksradNr: x.spiel.gluecksradNr ?? 0,
+        gedreht: x.spiel.gedreht ?? [],
+        wurfStatistik: x.spiel.wurfStatistik ?? Array<number>(13).fill(0),
       }
     : null;
   return {
@@ -112,7 +116,8 @@ const CHAT_PRO_10S = 5;
 /** Schlüssel des aktuellen Zeitabschnitts: Wechselt er, beginnt ein neuer Timer. */
 function schritt(s: GameState): [string, TimerArt] {
   if (s.phase === 'setup') return [`s:${s.setup.schritt}:${s.setup.erwartet}`, 'zug'];
-  if (s.phase === 'abwerfen') return [`a:${s.zugNr}`, 'abwerfen'];
+  // Nach einem Dreh am Glücksrad beginnt die Abwurfzeit neu (die Animation soll keine Zeit kosten).
+  if (s.phase === 'abwerfen') return [`a:${s.zugNr}:${s.gedreht.length}`, 'abwerfen'];
   if (s.phase === 'sonderbau') return [`b:${s.zugNr}:${s.sonderbau!.index}`, 'sonderbau'];
   return [`z:${s.zugNr}`, 'zug'];
 }
@@ -555,6 +560,7 @@ export class Host extends Beobachtbar implements Sitzung {
         freundlicherRaeuber: d.einstellungen.freundlicherRaeuber,
         sonderbauphase: d.einstellungen.sonderbauphase,
         abwurfGrenze: d.einstellungen.abwurfGrenze,
+        gluecksrad: d.einstellungen.gluecksrad,
       },
     });
     // Die Engine mischt die Sitzreihenfolge; Namen sind in der Lobby eindeutig.

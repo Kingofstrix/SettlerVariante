@@ -118,6 +118,8 @@ Wo jede Regel umgesetzt und getestet ist. Pfade relativ zu `src/engine/` bzw. `t
 | Chat (Host verteilt, Spam-Bremse, 200 Zeichen, Beamer nur lesen, im Export) | `netz/host.ts`: `chatHinzu`; `netz/protokoll.ts`; `ui/Chat.tsx` | `host.test.ts` „verteilt Nachrichten an alle, bremst Spam …“ |
 | Gut sichtbare Handelsangebote | `ui/Teile.tsx`: `AngebotsListe` | von Hand |
 | Würfel in der Mitte, danach an den Rand | `ui/WuerfelBuehne.tsx` | von Hand |
+| Glücksrad bei 7: 30 % kein Abwurf, 70 % doppelt (max. ganze Hand), einmal pro 7, abschaltbar | `engine/engine.ts`: `GLUECKSRAD_DREHEN`; `ui/Gluecksrad.tsx` | `engine.test.ts` „Glücksrad (Las Vegas)“ (5 Tests, u. a. Quote ≈ 30 % über 2000 Drehs); `host.test.ts` „Lobby-Schalter … Abwurfzeit neu“ |
+| Würfelstatistik der laufenden Partie (Diagramm, Erwartungswert, letzter Wurf) | `engine/engine.ts`: `wurfStatistik`; `ui/Statistik.tsx` | `engine.test.ts` „zählt jeden Wurf je Augensumme, auch per Zeitablauf“ |
 | Kartenflug Hand ↔ Bank ↔ Mitspieler | `engine/engine.ts`: `bewege`; `engine/sicht.ts`; `ui/animation.tsx` | `engine.test.ts` „Kartenbewegungen …“ (3 Tests, u. a. kein Verraten des Rohstoffs an Dritte) |
 | Würfelertrag fliegt vom Feld | `engine.ts`: `verteile` (`Bewegung.hex`); `ui/animation.tsx` | `erweiterungen.test.ts` „jede Bewegung nennt das Feld …“ |
 | Verlauf mit Zug, Spieler und Ort; neue Bauten markiert | `engine.ts`: `log`; `ui/verlauf.ts`; `ui/Teile.tsx`: `LogListe`; `ui/Brett.tsx` | `erweiterungen.test.ts` „Logdaten“ (2 Tests) |

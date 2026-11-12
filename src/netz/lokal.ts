@@ -21,6 +21,7 @@ export class LokalSitzung extends Beobachtbar implements Sitzung {
         freundlicherRaeuber: einstellungen.freundlicherRaeuber,
         sonderbauphase: einstellungen.sonderbauphase,
         abwurfGrenze: einstellungen.abwurfGrenze,
+        gluecksrad: einstellungen.gluecksrad,
       },
     });
     this.wer = amZug(this.spiel)[0] ?? 0;

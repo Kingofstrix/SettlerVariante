@@ -220,18 +220,43 @@ export function HandelDialog({
 
 // ---------- Abwerfen ----------
 
-export function AbwerfenDialog({ sicht, aktion, rest }: { sicht: Sicht; aktion: (a: Absicht) => void; rest: number | null }): JSX.Element {
+export function AbwerfenDialog({
+  sicht,
+  aktion,
+  rest,
+  onDrehen,
+}: {
+  sicht: Sicht;
+  aktion: (a: Absicht) => void;
+  rest: number | null;
+  onDrehen: () => void;
+}): JSX.Element {
   const ich = sicht.ich!;
   const hand = sicht.spieler[ich].hand!;
   const soll = sicht.abwerfen[ich];
   const [karten, setKarten] = useState<Rohstoffe>(leereRohstoffe());
   const n = summe(karten);
+  const gedreht = sicht.gedreht.includes(ich);
+  const kannDrehen = sicht.config.gluecksrad && !gedreht;
+  const doppelt = Math.min(2 * soll, summe(hand));
   return (
-    <Modal titel={`Eine 7! Wirf ${soll} Karten ab`} breit>
+    <Modal titel={gedreht ? `Pech am Glücksrad! Wirf ${soll} Karten ab` : `Eine 7! Wirf ${soll} Karten ab`} breit>
       <p class="hinweis">
-        Du hast mehr als {sicht.config.abwurfGrenze} Karten und musst die Hälfte (abgerundet) abgeben.
+        {gedreht ? 'Das Glücksrad hat das Soll verdoppelt.' : `Du hast mehr als ${sicht.config.abwurfGrenze} Karten und musst die Hälfte (abgerundet) abgeben.`}
         {rest !== null && <b> Noch {rest} s – danach wird zufällig abgeworfen.</b>}
       </p>
+      {kannDrehen && (
+        <div class="vegas-wahl">
+          <button class="vegas-knopf" onClick={onDrehen}>
+            <span class="vegas-titel">🎰 Glücksrad drehen</span>
+            <span class="vegas-chancen">
+              <span class="gut">30 %: nichts abwerfen</span>
+              <span class="schlecht">70 %: {doppelt === summe(hand) ? `alle ${doppelt}` : doppelt} Karten abwerfen</span>
+            </span>
+          </button>
+          <span class="vegas-oder">oder klassisch abwerfen:</span>
+        </div>
+      )}
       <div class="abwurf">
         {ROHSTOFFE.map((r) => (
           <div class={`abwurf-karte ${hand[r] === 0 ? 'leer' : ''}`}>

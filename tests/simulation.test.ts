@@ -18,6 +18,7 @@ describe('Simulation', () => {
           freundlicherRaeuber: spielNr % 3 === 0,
           sonderbauAutoSkip: spielNr % 2 === 0,
           siegpunkte: [8, 10, 12][spielNr % 3],
+          gluecksrad: spielNr % 4 !== 1,
         },
       });
       for (let schritt = 0; schritt < 6000 && s.phase !== 'ende'; schritt++) {

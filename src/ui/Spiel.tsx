@@ -30,6 +30,8 @@ import { ChatEingabe, ChatVerlauf } from './Chat';
 import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WunschTafel, WurfAnzeige, statusText } from './Teile';
 import { PunkteVerlauf, WuerfelVerteilung } from './Statistik';
 import { logSymbol, neueBauten } from './verlauf';
+import { GluecksradBuehne, useGluecksrad } from './Gluecksrad';
+import { WuerfelStatistik } from './WurfStatistik';
 import { WuerfelBuehne, useWuerfelAnimation } from './WuerfelBuehne';
 import { toast, useRestzeit, useSitzung } from './hooks';
 import { setzeTon, ton, tonAn } from './ton';
@@ -128,6 +130,7 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
   const [, neu] = useState(0);
   useEreignisse(z, sicht);
   const { anim: wuerfelAnim, starte: wuerfelStart, zentral: wurfZentral } = useWuerfelAnimation(sicht, z.hinweis?.nr);
+  const rad = useGluecksrad(sicht, false, z.hinweis?.nr);
   useKartenFluege(sicht);
 
   const binAktiv = sicht.aktiv === ich;
@@ -392,7 +395,21 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
         </div>
       </footer>
 
-      {sicht.phase === 'abwerfen' && sicht.abwerfen[ich] !== undefined && <AbwerfenMitRestzeit sicht={sicht} aktion={aktion} timer={z.timer} />}
+      {sicht.phase === 'abwerfen' && sicht.abwerfen[ich] !== undefined && (
+        <AbwerfenMitRestzeit
+          // Neu aufbauen, wenn ein anderer Spieler (Hot-Seat) oder ein neues Soll (Glücksrad) dran ist
+          key={`${ich}:${sicht.abwerfen[ich]}`}
+          sicht={sicht}
+          aktion={aktion}
+          timer={z.timer}
+          onDrehen={() => {
+            if (z.pausiert) return;
+            rad.starte();
+            aktion({ typ: 'GLUECKSRAD_DREHEN' });
+          }}
+        />
+      )}
+      {rad.anzeige && <GluecksradBuehne key={rad.anzeige.id} anzeige={rad.anzeige} onFertig={rad.fertig} eilig={rad.wartend > 0} />}
       {sicht.phase === 'stehlen' && binAktiv && <StehlenDialog sicht={sicht} aktion={aktion} />}
       {dialog === 'handel' && sicht.phase === 'aktion' && <HandelDialog sicht={sicht} vorlage={gegen} aktion={aktion} onZu={() => setDialog(null)} />}
       {dialog === 'erfindung' && <ErfindungDialog sicht={sicht} aktion={aktion} onZu={() => setDialog(null)} />}
@@ -408,9 +425,19 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
 }
 
 /** Hält den Sekundentakt der Restzeit aus der Spielansicht heraus: Nur dieser Dialog rendert viermal je Sekunde neu. */
-function AbwerfenMitRestzeit({ sicht, aktion, timer }: { sicht: Sicht; aktion: (a: Absicht) => void; timer: TimerAnzeige | null }): JSX.Element {
+function AbwerfenMitRestzeit({
+  sicht,
+  aktion,
+  timer,
+  onDrehen,
+}: {
+  sicht: Sicht;
+  aktion: (a: Absicht) => void;
+  timer: TimerAnzeige | null;
+  onDrehen: () => void;
+}): JSX.Element {
   const rest = useRestzeit(timer?.art === 'abwerfen' ? timer : null);
-  return <AbwerfenDialog sicht={sicht} aktion={aktion} rest={rest} />;
+  return <AbwerfenDialog sicht={sicht} aktion={aktion} rest={rest} onDrehen={onDrehen} />;
 }
 
 /** Kurzes Konfetti zum Sieg (aus bei "Bewegung reduzieren"). */
@@ -618,7 +645,7 @@ export function Menue({ sitzung, z, onZu, onVerlassen }: { sitzung: Sitzung; z: 
 
 /** Seitenleiste unten: Spielverlauf und Chat als Reiter, mit Zähler für ungelesene Nachrichten. */
 export function VerlaufUndChat({ z, sitzung, onOrt }: { z: SitzungsZustand; sitzung: Sitzung; onOrt?: (o: Ort) => void }): JSX.Element {
-  const [reiter, setReiter] = useState<'log' | 'chat'>('log');
+  const [reiter, setReiter] = useState<'log' | 'chat' | 'statistik'>('log');
   const letzte = z.chat.at(-1)?.nr ?? 0;
   const [gelesen, setGelesen] = useState(letzte);
   const sicht = z.sicht!;
@@ -642,19 +669,30 @@ export function VerlaufUndChat({ z, sitzung, onOrt }: { z: SitzungsZustand; sitz
   }, [letzte]);
 
   const ungelesen = z.chat.filter((c) => c.nr > gelesen && c.name !== meinName).length;
-  if (!mitChat) return <LogListe sicht={sicht} onOrt={onOrt} />;
   return (
-    <div class="verlauf-chat">
+    <div class={`verlauf-chat ${reiter === 'statistik' ? 'aufgeklappt' : ''}`}>
       <div class="reiter" role="tablist">
         <button role="tab" aria-selected={reiter === 'log'} class={`reiter-knopf ${reiter === 'log' ? 'an' : ''}`} onClick={() => setReiter('log')}>
           Verlauf
         </button>
-        <button role="tab" aria-selected={reiter === 'chat'} class={`reiter-knopf ${reiter === 'chat' ? 'an' : ''}`} onClick={() => setReiter('chat')}>
-          Chat {ungelesen > 0 && <span class="zaehler-punkt">{ungelesen}</span>}
+        {mitChat && (
+          <button role="tab" aria-selected={reiter === 'chat'} class={`reiter-knopf ${reiter === 'chat' ? 'an' : ''}`} onClick={() => setReiter('chat')}>
+            Chat {ungelesen > 0 && <span class="zaehler-punkt">{ungelesen}</span>}
+          </button>
+        )}
+        <button
+          role="tab"
+          aria-selected={reiter === 'statistik'}
+          class={`reiter-knopf ${reiter === 'statistik' ? 'an' : ''}`}
+          onClick={() => setReiter('statistik')}
+        >
+          Statistik
         </button>
       </div>
       {reiter === 'log' ? (
         <LogListe sicht={sicht} onOrt={onOrt} />
+      ) : reiter === 'statistik' ? (
+        <WuerfelStatistik sicht={sicht} />
       ) : (
         <div class="chat">
           <ChatVerlauf eintraege={z.chat} meinName={meinName} />

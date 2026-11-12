@@ -122,7 +122,12 @@ export interface SpielConfig {
   sonderbauAutoSkip: boolean; // Spieler, die nichts bauen können, in der Sonderbauphase überspringen
   sonderbauphase: boolean; // Sonderbauphase bei 5–6 Spielern
   abwurfGrenze: number; // bei einer 7 wirft ab, wer mehr Karten hat (7 oder 9)
+  /** Las-Vegas-Variante: Bei einer 7 darf man statt abzuwerfen am Glücksrad drehen. */
+  gluecksrad: boolean;
 }
+
+/** Gewinnchance am Glücksrad. */
+export const GLUECKSRAD_CHANCE = 0.3;
 
 export const STANDARD_CONFIG: SpielConfig = {
   layout: 'zufall',
@@ -131,6 +136,7 @@ export const STANDARD_CONFIG: SpielConfig = {
   sonderbauAutoSkip: true,
   sonderbauphase: true,
   abwurfGrenze: 7,
+  gluecksrad: false,
 };
 
 export interface Handelsangebot {
@@ -158,6 +164,19 @@ export interface Ort {
   ecke?: number;
   kante?: number;
   hex?: number;
+}
+
+/** Ergebnis eines Drehs am Glücksrad (öffentlich, für die Animation). */
+export interface GluecksradDreh {
+  nr: number;
+  spieler: number;
+  gewonnen: boolean;
+  /** Abwurf-Soll vor dem Dreh */
+  vorher: number;
+  /** Abwurf-Soll nach dem Dreh (0 bei Gewinn) */
+  nachher: number;
+  /** Verloren und das doppelte Soll war die ganze Hand: alles wurde direkt abgeworfen */
+  alle: boolean;
 }
 
 export interface LogEintrag {
@@ -220,12 +239,19 @@ export interface GameState {
   bewegungen: Bewegung[];
   bewegungNr: number;
   statistik: Statistik;
+  /** Die letzten Drehs am Glücksrad und wer bei der aktuellen 7 schon gedreht hat. */
+  gluecksrad: GluecksradDreh[];
+  gluecksradNr: number;
+  gedreht: number[];
+  /** Wie oft jede Augensumme gefallen ist (Index = Summe, 2–12). Anders als statistik.wuerfe immer öffentlich (Reiter „Statistik“). */
+  wurfStatistik: number[];
 }
 
 // Aktionen (Intentionen). "spieler" setzt immer der Host anhand der Verbindung.
 export type Aktion =
   | { typ: 'WUERFELN'; spieler: number }
   | { typ: 'ABWERFEN'; spieler: number; karten: Partial<Rohstoffe> }
+  | { typ: 'GLUECKSRAD_DREHEN'; spieler: number }
   | { typ: 'RAEUBER_SETZEN'; spieler: number; hex: number }
   | { typ: 'STEHLEN'; spieler: number; opfer: number }
   | { typ: 'STRASSE_BAUEN'; spieler: number; kante: number }
