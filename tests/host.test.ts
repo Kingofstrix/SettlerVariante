@@ -120,6 +120,67 @@ describe('Lobby', () => {
   });
 });
 
+describe('Abstimmung über die Karte', () => {
+  it('Stimmen stehen in der Lobby; die Mehrheit bestimmt die Karte der Partie', async () => {
+    const { t, h, g } = await raum(3);
+    expect(g[0].letzte('lobby')!.sitze.map((s) => s.stimme)).toEqual([null, null, null, null]);
+    g[0].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'spirale' });
+    g[1].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'spirale' });
+    g[2].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'fjorde' });
+    h.stimme('fjorde');
+    expect(g[2].letzte('lobby')!.sitze.map((s) => s.stimme)).toEqual(['fjorde', 'spirale', 'spirale', 'fjorde']);
+    // umentscheiden und zurücknehmen
+    g[2].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'spirale' });
+    h.stimme(null);
+    expect(h.zustand.sitze.map((s) => s.stimme)).toEqual([null, 'spirale', 'spirale', 'spirale']);
+    // Ungültiges und Stimmen vom Beamer zählen nicht
+    g[0].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'atlantis' });
+    g[0].sende({ v: PROTOKOLL_VERSION, t: 'stimme' });
+    const beamer = t.gast('beamer-token-1', 'Beamer', 'beamer');
+    beamer.sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'klassik' });
+    expect(h.zustand.sitze.map((s) => s.stimme)).toEqual([null, 'spirale', 'spirale', 'spirale']);
+    h.host.starten();
+    const s = zustand(h);
+    expect(s.config.karte).toBe('spirale');
+    expect(s.brett.hexes.length).toBe(33);
+    expect(s.log.some((l) => l.text === 'Karte: Spirale (3 von 4 Stimmen).')).toBe(true);
+    expect(g[0].letzte('spiel')!.sicht.brett!.hexes.length).toBe(33);
+    // Im laufenden Spiel wird nicht mehr abgestimmt; zurück in der Lobby stehen die Stimmen noch
+    g[0].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'klassik' });
+    h.host.zurLobby();
+    expect(h.zustand.sitze.map((x) => x.stimme)).toEqual([null, 'spirale', 'spirale', 'spirale']);
+  });
+  it('ohne Stimmen wird Klassik gespielt; bei Gleichstand entscheidet das Los unter den führenden Karten', async () => {
+    const ohne = await raum(2);
+    ohne.h.host.starten();
+    expect(zustand(ohne.h).config.karte).toBe('klassik');
+    expect(zustand(ohne.h).brett.hexes.length).toBe(19);
+    expect(zustand(ohne.h).log.some((l) => l.text.startsWith('Karte:'))).toBe(false);
+    const gezogen = new Set<string>();
+    for (let i = 0; i < 12; i++) {
+      const { h, g } = await raum(3);
+      g[0].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'zwillinge' });
+      g[1].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'fjorde' });
+      h.host.starten();
+      const s = zustand(h);
+      expect(['zwillinge', 'fjorde']).toContain(s.config.karte);
+      expect(s.log.some((l) => /^Karte: .+ \(per Los bei Gleichstand, je 1 von 4 Stimmen\)\.$/.test(l.text))).toBe(true);
+      gezogen.add(s.config.karte);
+    }
+    expect(gezogen.size).toBe(2); // nicht immer dieselbe Karte
+  });
+  it('Stimmen überstehen Export und Import; alte Spielstände ohne Stimmen laden weiter', async () => {
+    const { h, g } = await raum(2);
+    g[0].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'zwillinge' });
+    const daten = pruefeHostDaten(JSON.parse(h.host.exportieren()))!;
+    expect(daten.sitze.map((s) => s.stimme)).toEqual([null, 'zwillinge', null]);
+    const alt = JSON.parse(h.host.exportieren());
+    for (const s of alt.sitze) delete s.stimme;
+    alt.sitze[1].stimme = 'atlantis';
+    expect(pruefeHostDaten(alt)!.sitze.map((s) => s.stimme)).toEqual([null, null, null]);
+  });
+});
+
 describe('Spiel über den Host', () => {
   it('gefilterte Sicht: eigene Karten ja, fremde nur als Anzahl; Beamer sieht keine Hände', async () => {
     const { t, h, g } = await raum(3);

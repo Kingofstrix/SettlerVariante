@@ -52,4 +52,32 @@ describe('Simulation', () => {
     // Abgelehnte Aktionen sind erlaubt (z. B. Annahme eines unbezahlbaren Handels), sollten aber selten sein
     expect(abgelehnt / aktionen).toBeLessThan(0.05);
   });
+
+  it('je 40 Zufallsspiele auf den neuen Karten: alle enden, Kartenbilanz stimmt', () => {
+    for (const karte of ['zwillinge', 'spirale', 'fjorde'] as const) {
+      let beendet = 0;
+      for (let spielNr = 0; spielNr < 40; spielNr++) {
+        const n = 3 + (spielNr % 4);
+        const rng = { rngState: 5000 + spielNr };
+        let s: GameState = neuesSpiel({
+          spieler: Array.from({ length: n }, (_, i) => ({ name: `S${i}`, farbe: FARBEN[i] })),
+          seed: spielNr * 104729 + 3,
+          config: { karte, freundlicherRaeuber: spielNr % 3 === 0, siegpunkte: [8, 10, 12][spielNr % 3], gluecksrad: spielNr % 2 === 0 },
+        });
+        expect(s.config.karte).toBe(karte);
+        for (let schritt = 0; schritt < 9000 && s.phase !== 'ende'; schritt++) {
+          const a = rng.rngState % 17 === 0 ? ({ typ: 'ZEIT_ABGELAUFEN', spieler: 0 } as const) : zufallsAktion(s, rng);
+          rng.rngState = (rng.rngState + 1) | 0;
+          expect(a).not.toBe(null);
+          const e = anwenden(s, a!);
+          if (!e.ok) continue;
+          s = e.state;
+          const verstoesse = pruefeInvarianten(s);
+          if (verstoesse.length) throw new Error(`${karte}, Spiel ${spielNr}, Schritt ${schritt}: ${verstoesse.join('; ')}`);
+        }
+        if (s.phase === 'ende') beendet++;
+      }
+      expect(beendet).toBeGreaterThanOrEqual(36);
+    }
+  });
 });

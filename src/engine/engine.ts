@@ -1,5 +1,6 @@
 // Deterministischer Reducer: (state, aktion) => state | fehler. Alle Validierung passiert hier.
 import { erzeugeBrett } from './brett';
+import { KARTEN_NAME } from './karten';
 import { mischen, waehle, zufall, zufallInt } from './rng';
 import {
   anliegerGegner,
@@ -57,6 +58,8 @@ export interface NeuesSpielOptionen {
   config?: Partial<SpielConfig>;
   /** Für Tests: Sitzreihenfolge nicht mischen. */
   ohneMischen?: boolean;
+  /** Zusatz für die Logzeile zur Karte, z. B. das Ergebnis der Abstimmung. */
+  kartenHinweis?: string;
 }
 
 export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
@@ -65,7 +68,7 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
   const config: SpielConfig = { ...STANDARD_CONFIG, ...opt.config };
   const rng = { rngState: opt.seed | 0 };
   const reihenfolge = opt.ohneMischen ? opt.spieler : mischen(rng, opt.spieler);
-  const brett = erzeugeBrett(n >= 5, config.layout, rng);
+  const brett = erzeugeBrett(n >= 5, config.layout, rng, config.karte);
   const stapel = mischen(rng, entwStapel(n));
   const proRohstoff = kartenProRohstoff(n);
   const s: GameState = {
@@ -119,6 +122,8 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
     wurfStatistik: Array<number>(13).fill(0),
   };
   log(s, `Spiel gestartet (Seed ${s.seed}). Reihenfolge: ${s.spieler.map((p) => p.name).join(', ')}.`);
+  if (config.karte !== 'klassik' || opt.kartenHinweis)
+    log(s, `Karte: ${KARTEN_NAME[config.karte]}${opt.kartenHinweis ? ` (${opt.kartenHinweis})` : ''}.`);
   log(s, `Gründungsphase: ${s.spieler[0].name} setzt die erste Siedlung.`);
   return s;
 }

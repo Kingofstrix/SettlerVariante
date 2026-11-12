@@ -4,10 +4,16 @@ import {
   STANDARD_CONFIG,
   amZug,
   anwenden,
+  istKarte,
   leereStatistik,
   neuesSpiel,
   sichtFuer,
+  waehleKarte,
+  zaehleStimmen,
+  zufall,
   type GameState,
+  type KartenId,
+  type RngTraeger,
   type Rohstoff,
 } from '../engine';
 import { partieAus, partien, uebernimm } from './rangliste';
@@ -34,7 +40,7 @@ export interface HostDaten {
   v: 1;
   raumCode: string;
   hostToken: string;
-  sitze: { token: string; name: string; farbe: string }[];
+  sitze: { token: string; name: string; farbe: string; stimme?: KartenId | null }[];
   einstellungen: Einstellungen;
   spiel: GameState | null;
   /** Token je Spielerindex des laufenden Spiels. */
@@ -72,7 +78,7 @@ export function pruefeHostDaten(d: unknown): HostDaten | null {
     v: 1,
     raumCode: x.raumCode,
     hostToken: typeof x.hostToken === 'string' ? x.hostToken : '',
-    sitze: x.sitze,
+    sitze: x.sitze.map((s) => ({ token: s.token, name: s.name, farbe: s.farbe, stimme: istKarte(s.stimme) ? s.stimme : null })),
     einstellungen: { ...STANDARD_EINSTELLUNGEN, ...x.einstellungen },
     spiel,
     spielerTokens: x.spielerTokens,
@@ -275,6 +281,9 @@ export class Host extends Beobachtbar implements Sitzung {
         case 'profil':
           if (g.rolle === 'spieler' && g.token && !this.daten.spiel) this.setzeProfil(g.token, n.name, n.farbe);
           return;
+        case 'stimme':
+          if (g.rolle === 'spieler' && g.token) this.setzeStimme(g.token, n.karte);
+          return;
         case 'absicht': {
           if (g.rolle !== 'spieler' || !g.token) return;
           const fehler = this.verarbeite(g.token, n.aktion);
@@ -320,7 +329,7 @@ export class Host extends Beobachtbar implements Sitzung {
     if (!bekannt) {
       if (this.daten.spiel) return this.beende(g, 'laeuft');
       if (this.daten.sitze.length >= this.daten.einstellungen.maxSpieler) return this.beende(g, 'voll');
-      this.daten.sitze.push({ token, name: '', farbe: '' });
+      this.daten.sitze.push({ token, name: '', farbe: '', stimme: null });
       this.setzeProfil(token, name, farbe, true);
     }
     // Doppelter Tab: der neue übernimmt, der alte bekommt einen Hinweis.
@@ -422,6 +431,7 @@ export class Host extends Beobachtbar implements Sitzung {
         latenz: istHost ? 0 : g ? (g.latenz === null ? null : Math.round(g.latenz / 10) * 10) : null,
         weg: istHost ? 'lokal' : (g?.weg ?? null),
         istHost,
+        stimme: s.stimme ?? null,
       };
     });
   }
@@ -524,6 +534,19 @@ export class Host extends Beobachtbar implements Sitzung {
     if (!this.daten.spiel) this.setzeProfil(this.daten.hostToken, name, farbe);
   }
 
+  stimme(karte: KartenId | null): void {
+    this.setzeStimme(this.daten.hostToken, karte);
+  }
+
+  /** Abgestimmt wird nur in der Lobby; die Stimme gehört zum Sitz und bleibt für die nächste Partie stehen. */
+  private setzeStimme(token: string, karte: KartenId | null): void {
+    const sitz = this.daten.sitze.find((s) => s.token === token);
+    if (!sitz || this.daten.spiel || (sitz.stimme ?? null) === karte) return;
+    sitz.stimme = karte;
+    this.speichern();
+    this.rundsenden();
+  }
+
   private vorSchliessen = (e: BeforeUnloadEvent): void => {
     if (this.daten.spiel && this.daten.spiel.phase !== 'ende') e.preventDefault();
   };
@@ -551,10 +574,24 @@ export class Host extends Beobachtbar implements Sitzung {
     const d = this.daten;
     if (d.spiel || d.sitze.length < 3) return this.hinweis('Zum Starten braucht es mindestens 3 Spieler.');
     const seed = zufallsSeed();
+    // Auszählen: Die meisten Stimmen gewinnen. Das Los bei Gleichstand hängt am Seed, zieht aber
+    // nicht aus dem Spiel-RNG (gleicher Seed und gleiche Karte ergeben weiter dasselbe Brett).
+    const stimmen = d.sitze.map((s) => s.stimme ?? null);
+    const los: RngTraeger = { rngState: seed ^ 0x4b617274 };
+    const wahl = waehleKarte(stimmen, () => zufall(los));
+    const zaehlung = zaehleStimmen(stimmen);
+    const kartenHinweis =
+      zaehlung.abgegeben === 0
+        ? undefined
+        : wahl.los
+          ? `per Los bei Gleichstand, je ${zaehlung.stimmen[wahl.karte]} von ${d.sitze.length} Stimmen`
+          : `${zaehlung.stimmen[wahl.karte]} von ${d.sitze.length} Stimmen`;
     d.spiel = neuesSpiel({
       spieler: d.sitze.map((s) => ({ name: s.name, farbe: s.farbe })),
       seed,
+      kartenHinweis,
       config: {
+        karte: wahl.karte,
         layout: d.einstellungen.layout,
         siegpunkte: d.einstellungen.siegpunkte,
         freundlicherRaeuber: d.einstellungen.freundlicherRaeuber,

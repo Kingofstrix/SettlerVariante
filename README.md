@@ -5,6 +5,7 @@ Browser-Mehrspielerspiel für 3–6 Personen nach dem Prinzip „siedeln, handel
 - **Statische Web-App** (Vite, TypeScript, Preact, SVG), Hosting auf GitHub Pages.
 - **Peer-to-Peer über WebRTC** (PeerJS). Der Browser des Hosts rechnet das ganze Spiel, alle anderen treten mit einem Raumcode bei.
 - Standardregeln plus 5–6-Spieler-Erweiterung mit **Sonderbauphase**, Zugtimer, Beameransicht.
+- **Vier Karten** (Klassik, Zwillingsinseln, Spirale, Fjordland), über die in der Lobby **abgestimmt** wird.
 - **Bankübersicht** (Karten je Rohstoff in der Bank und bei den Spielern), **Chat**, gut sichtbare **Handelsangebote**, **Würfel in der Brettmitte** und **Kartenflug-Animationen** zwischen Hand, Bank und Mitspielern.
 - **Rangliste der Feigen Sippe** auf der Startseite und in der Lobby, **Statistik und Titel** am Spielende, **Suche/Biete-Wunschtafel**, Hinweise auf **unmögliche Handel**, hervorgehobene **neue Bauten** und **Ertragsfelder**, Verlauf nach Zügen.
 
@@ -46,7 +47,8 @@ Zum schnellen Ausprobieren gibt es außerdem auf der Startseite „Lokal an eine
 2. **Mitspieler** öffnen die Seite, „Raum beitreten“, Code eingeben (oder Einladungslink aus der Lobby).
 3. **Beamer-Laptop** öffnet die Seite, gibt den Code ein und klickt „Als Beamer verbinden“. Im Spiel oben rechts ⛶ für Vollbild.
 4. In der Lobby prüft der Host den **Verbindungstest**: Status, Latenz, „direkt“ oder „Relay“ für jeden Spieler.
-5. Einstellungen wählen (Brett, Siegpunkte, Timer) und „Spiel starten“ (ab 3 Spielern).
+5. Alle stimmen über die **Karte** ab (Klick auf eine der vier Karten; noch einmal klicken nimmt die Stimme zurück).
+6. Einstellungen wählen (Siegpunkte, Timer) und „Spiel starten“ (ab 3 Spielern).
 
 Im Spiel:
 
@@ -70,6 +72,28 @@ Tipps:
 - **Pause** für die Vorlesung: Host-Menü (☰) → „Spiel pausieren“.
 - 6 Spieler mit Sonderbauphase dauern eher 2 Stunden als 90 Minuten. Für eine Vorlesung: **8 Siegpunkte** einstellen.
 - Vor dem Termin einmal im echten Raum mit zwei Laptops testen (siehe nächster Abschnitt).
+
+## Karten und Abstimmung
+
+| Karte | Form | Felder (3–4 / 5–6 Spieler) |
+|---|---|---|
+| Klassik | das bekannte Sechseck | 19 / 30 |
+| Zwillingsinseln | zwei Inseln ohne Landverbindung | 26 / 38 |
+| Spirale | ein zwei Felder breiter Arm um einen Kern, dazwischen eine Rinne | 33 / 39 |
+| Fjordland | eine Insel mit tiefen Buchten | 25 / 37 |
+
+- **Abstimmung:** Jeder Spieler hat in der Lobby eine Stimme und kann sie bis zum Start ändern. Beim Start gewinnt die Karte mit den
+  meisten Stimmen. Bei Gleichstand entscheidet das Los unter den führenden Karten, ohne Stimmen wird Klassik gespielt. Das Ergebnis
+  steht zu Beginn im Verlauf („Karte: Spirale (3 von 5 Stimmen).“). Der Beamer sieht den Stand, stimmt aber nicht mit.
+- **Belegung:** Die neuen Karten werden immer zufällig belegt: Gelände im Verhältnis des Grundspiels (4:4:4:3:3, dazu 1–2 Wüsten),
+  6 und 8 nie nebeneinander, 9 bzw. 11 Häfen möglichst weit auseinander an der Küste. Auf den Zwillingsinseln hat jede Insel alle fünf
+  Rohstoffe und höchstens eine Wüste. Die Einstellung „Verteilung auf Klassik“ (Anfänger/Zufall) gilt nur für Klassik.
+- **Kein Seeweg:** Es gibt keine Schiffe. Auf den Zwillingsinseln bleibt jeder auf den Inseln, auf denen er gegründet hat.
+- **Material unverändert:** Rohstoffkarten, Entwicklungskarten und Figuren sind dieselben wie auf Klassik. Die neuen Karten haben
+  mehr Felder, die Bank wird dort also eher knapp.
+- **Lokal ausprobieren:** Startseite → „Lokal an einem Gerät spielen“ → Karte wählen.
+- **Neue Karte anlegen:** in `src/engine/karten.ts` eine Form aus Textzeilen eintragen (X = Land), Name und Text ergänzen.
+  Vorschau, Abstimmung und Brett kommen von selbst. Höchstens sieben Zeilen, sonst werden die Felder kleiner als auf Klassik.
 
 ## Netzwerk: eduroam, TURN und der Hotspot-Plan
 
@@ -137,6 +161,7 @@ Fällt der öffentliche PeerJS-Server aus, kann jeder einen eigenen starten (`np
 ```
 src/engine/   Reine Regel-Engine (kein DOM, kein Netz). anwenden(state, aktion) → state | fehler
   typen.ts      Datenmodell und Aktionen
+  karten.ts     Kartenformen (welche Felder Land sind) und die Auszählung der Abstimmung
   brett.ts      Graph (Hex/Ecke/Kante, Axialkoordinaten), Brettgenerierung, Häfen
   regeln.ts     Bauplätze, Abstandsregel, längste Straße (DFS), Tauschkurse, Räuberfelder
   engine.ts     Reducer mit allen Aktionen, Sonderkarten, Sonderbauphase, Sieg
@@ -157,7 +182,8 @@ src/ui/       Preact-Oberfläche: Start, Lobby, Spieler- und Beameransicht, Dial
                 in einer Partie nicht) und Spielebene (Straßen, Gebäude, Räuber, Bauplätze)
   Gelaende.tsx  Geländebilder und Verläufe, je einmal in <defs>, pro Feld per <use>
   brett.css     Styles des Bretts, stil.css der Rest der Oberfläche
-tests/        Vitest: Brett, Regeln, Engine, Host, Simulation
+  Kartenwahl.tsx  Kartenvorschau und Abstimmung in der Lobby
+tests/        Vitest: Brett, Karten, Regeln, Engine, Host, Simulation
 ```
 
 Grundsätze:

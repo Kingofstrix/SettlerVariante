@@ -1,4 +1,5 @@
 // Zentrale Typen der Regel-Engine. Kein DOM, kein Netzwerk.
+import type { KartenId } from './karten';
 
 export const ROHSTOFFE = ['holz', 'lehm', 'wolle', 'getreide', 'erz'] as const;
 export type Rohstoff = (typeof ROHSTOFFE)[number];
@@ -116,6 +117,9 @@ export type Phase =
 export type Layout = 'anfaenger' | 'zufall';
 
 export interface SpielConfig {
+  /** Form der Insel(n). */
+  karte: KartenId;
+  /** Verteilung auf der Karte „Klassik“; die anderen Karten werden immer zufällig belegt. */
   layout: Layout;
   siegpunkte: number; // 8, 10 oder 12
   freundlicherRaeuber: boolean;
@@ -130,6 +134,7 @@ export interface SpielConfig {
 export const GLUECKSRAD_CHANCE = 0.3;
 
 export const STANDARD_CONFIG: SpielConfig = {
+  karte: 'klassik',
   layout: 'zufall',
   siegpunkte: 10,
   freundlicherRaeuber: false,

@@ -1,6 +1,7 @@
 // Brettgeometrie (Axialkoordinaten, spitze Hexfelder) und Brettgenerierung.
+import { kartenFelder, type KartenId } from './karten';
 import type { Brett, Ecke, Gelaende, Hafen, HafenTyp, Hex, Kante, Layout } from './typen';
-import { mischen, type RngTraeger } from './rng';
+import { mischen, zufall, type RngTraeger } from './rng';
 
 const W3 = Math.sqrt(3);
 const RICHTUNGEN: [number, number][] = [
@@ -49,9 +50,8 @@ export function hexKoordinaten(gross: boolean): [number, number][] {
   return liste;
 }
 
-/** Baut den reinen Graphen (ohne Gelände, Zahlen, Häfen). */
-export function baueGraph(gross: boolean): Brett {
-  const koord = hexKoordinaten(gross);
+/** Baut den reinen Graphen (ohne Gelände, Zahlen, Häfen). Ohne `koord` entsteht das klassische Brett. */
+export function baueGraph(gross: boolean, koord: [number, number][] = hexKoordinaten(gross)): Brett {
   const hexes: Hex[] = [];
   const ecken: Ecke[] = [];
   const kanten: Kante[] = [];
@@ -175,6 +175,129 @@ function belege(brett: Brett, rng: RngTraeger): void {
   }
 }
 
+// ---------- Freie Karten (alles außer „Klassik“) ----------
+
+/** Landfelder einer Karte. */
+export function feldKoordinaten(karte: KartenId, gross: boolean): [number, number][] {
+  return karte === 'klassik' ? hexKoordinaten(gross) : kartenFelder(karte, gross);
+}
+
+/** Gelände für n Felder im Verhältnis des Grundspiels (4:4:4:3:3), dazu 1–3 Wüsten. */
+export function gelaendeFuer(n: number): Gelaende[] {
+  const wuesten = n < 28 ? 1 : n < 42 ? 2 : 3;
+  const p = n - wuesten;
+  const arten: [Gelaende, number][] = [['wald', 4], ['weide', 4], ['acker', 4], ['huegel', 3], ['gebirge', 3]];
+  const genau = arten.map(([, anteil]) => (p * anteil) / 18);
+  const anzahl = genau.map(Math.floor);
+  // Die übrigen Felder gehen an die Arten mit dem größten Rest.
+  const nachRest = arten.map((_, i) => i).sort((a, b) => genau[b] - anzahl[b] - (genau[a] - anzahl[a]) || a - b);
+  for (let i = 0, rest = p - anzahl.reduce((a, b) => a + b, 0); i < rest; i++) anzahl[nachRest[i]]++;
+  return [...arten.flatMap(([art], i) => Array<Gelaende>(anzahl[i]).fill(art)), ...Array<Gelaende>(wuesten).fill('wueste')];
+}
+
+/** Zahlenchips für n Ertragsfelder: volle Sätze des Grundspiels, den Rest von der Mitte der Würfelkurve her. */
+export function zahlenFuer(n: number): number[] {
+  const zusatz = [5, 9, 4, 10, 6, 8, 3, 11, 5, 9, 4, 10, 3, 11, 6, 8, 2, 12];
+  const l: number[] = [];
+  for (let i = 0; i < Math.floor(n / 18); i++) l.push(...ZAHLEN_KLEIN);
+  return [...l, ...zusatz.slice(0, n % 18)];
+}
+
+/** Zusammenhängende Landmassen als Listen von Feld-IDs. */
+export function inseln(brett: Brett): number[][] {
+  const gesehen = new Set<number>();
+  const liste: number[][] = [];
+  for (const h of brett.hexes) {
+    if (gesehen.has(h.id)) continue;
+    const insel: number[] = [];
+    const offen = [h.id];
+    gesehen.add(h.id);
+    while (offen.length) {
+      const id = offen.pop()!;
+      insel.push(id);
+      for (const n of brett.hexes[id].nachbarn) {
+        if (gesehen.has(n)) continue;
+        gesehen.add(n);
+        offen.push(n);
+      }
+    }
+    liste.push(insel);
+  }
+  return liste;
+}
+
+/**
+ * Wahr, wenn auf jeder Insel alle fünf Rohstoffe vorkommen (sonst säße dort jemand ohne Erz oder Lehm fest)
+ * und keine Insel mehr als eine Wüste trägt.
+ */
+function jedeInselVollstaendig(brett: Brett, landmassen: number[][]): boolean {
+  return landmassen.every((insel) => {
+    const gelaende = insel.map((id) => brett.hexes[id].gelaende);
+    return new Set(gelaende.filter((g) => g !== 'wueste')).size === 5 && gelaende.filter((g) => g === 'wueste').length <= 1;
+  });
+}
+
+function belegeFrei(brett: Brett, rng: RngTraeger): void {
+  const vorrat = gelaendeFuer(brett.hexes.length);
+  const landmassen = inseln(brett);
+  // Bei mehreren Inseln neu mischen, bis jede alle Rohstoffe hat (nach 200 Versuchen gilt die letzte Verteilung).
+  for (let versuch = 0; versuch < 200; versuch++) {
+    const gelaende = mischen(rng, vorrat);
+    brett.hexes.forEach((h, i) => (h.gelaende = gelaende[i]));
+    if (landmassen.length === 1 || jedeInselVollstaendig(brett, landmassen)) break;
+  }
+  const chips = zahlenFuer(brett.hexes.filter((h) => h.gelaende !== 'wueste').length);
+  // Neu mischen, bis die 6/8-Regel erfüllt ist.
+  for (;;) {
+    const zahlen = mischen(rng, chips);
+    let i = 0;
+    for (const h of brett.hexes) h.zahl = h.gelaende === 'wueste' ? null : zahlen[i++];
+    if (rotRegelOk(brett)) return;
+  }
+}
+
+/**
+ * Häfen für beliebige Küsten (mehrere Inseln, Buchten, Binnenseen): Der erste Platz wird gelost,
+ * jeder weitere ist die Küstenkante, die am weitesten von allen bisherigen Häfen entfernt liegt.
+ * Kein Hafen teilt eine Ecke mit einem anderen, und in jedem Wasserfeld liegt höchstens einer.
+ */
+function setzeHaefenFrei(brett: Brett, typen: HafenTyp[], rng: RngTraeger): void {
+  const plaetze = kuestenKanten(brett).map(({ kante, hex }) => {
+    const k = brett.kanten[kante];
+    const h = brett.hexes[hex];
+    const mx = (brett.ecken[k.a].x + brett.ecken[k.b].x) / 2;
+    const my = (brett.ecken[k.a].y + brett.ecken[k.b].y) / 2;
+    // Das Doppelte des Wegs zur Kantenmitte ist die Mitte des Wasserfelds dahinter.
+    const wasser = `${Math.round((h.x + (mx - h.x) * 2) * 10)},${Math.round((h.y + (my - h.y) * 2) * 10)}`;
+    return { k, x: h.x + (mx - h.x) * 1.75, y: h.y + (my - h.y) * 1.75, wasser };
+  });
+  const gewaehlt: typeof plaetze = [];
+  const frei = (p: (typeof plaetze)[number]): boolean =>
+    gewaehlt.every((g) => g.wasser !== p.wasser && g.k.a !== p.k.a && g.k.a !== p.k.b && g.k.b !== p.k.a && g.k.b !== p.k.b);
+  const abstand = (p: (typeof plaetze)[number]): number => Math.min(...gewaehlt.map((g) => Math.hypot(g.x - p.x, g.y - p.y)));
+  gewaehlt.push(plaetze[Math.floor(zufall(rng) * plaetze.length)]);
+  while (gewaehlt.length < typen.length) {
+    let bester: (typeof plaetze)[number] | null = null;
+    let weite = -1;
+    for (const p of plaetze) {
+      if (!frei(p)) continue;
+      const a = abstand(p);
+      if (a > weite + 1e-9) {
+        weite = a;
+        bester = p;
+      }
+    }
+    if (!bester) break; // Küste zu kurz für alle Häfen
+    gewaehlt.push(bester);
+  }
+  for (const e of brett.ecken) e.hafen = null;
+  brett.haefen = gewaehlt.map((p, i) => {
+    brett.ecken[p.k.a].hafen = typen[i];
+    brett.ecken[p.k.b].hafen = typen[i];
+    return { kante: p.k.id, typ: typen[i], x: p.x, y: p.y };
+  });
+}
+
 /** Je kleiner, desto ausgeglichener. Nur für das feste Anfänger-Layout. */
 function unwucht(brett: Brett): number {
   let s = 0;
@@ -209,8 +332,15 @@ function unwucht(brett: Brett): number {
  * Erzeugt ein vollständiges Brett.
  * "anfaenger": festes, ausgeglichenes Layout (deterministisch, unabhängig vom Spiel-Seed).
  * "zufall": gemischt mit dem Spiel-RNG; 6 und 8 liegen nie nebeneinander.
+ * Andere Karten als "klassik" werden immer zufällig belegt; `layout` gilt für sie nicht.
  */
-export function erzeugeBrett(gross: boolean, layout: Layout, rng: RngTraeger): Brett {
+export function erzeugeBrett(gross: boolean, layout: Layout, rng: RngTraeger, karte: KartenId = 'klassik'): Brett {
+  if (karte !== 'klassik') {
+    const frei = baueGraph(gross, kartenFelder(karte, gross));
+    belegeFrei(frei, rng);
+    setzeHaefenFrei(frei, mischen(rng, gross ? HAEFEN_GROSS : HAEFEN_KLEIN), rng);
+    return frei;
+  }
   const brett = baueGraph(gross);
   if (layout === 'zufall') {
     belege(brett, rng);
