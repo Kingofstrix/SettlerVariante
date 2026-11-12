@@ -143,6 +143,11 @@ src/netz/     Host-autoritatives Netzwerk
   lokal.ts      Hot-Seat an einem Gerät
 src/ui/       Preact-Oberfläche: Start, Lobby, Spieler- und Beameransicht, Dialoge, SVG-Brett,
               Chat, Würfelbühne, Kartenflug (animation.tsx)
+  tokens.css    Design-Tokens: alle Farben, Schatten, Radien, Schriften an einer Stelle
+  Brett.tsx     Brett als zwei gestapelte SVGs: Grundebene (Insel, Felder, Chips, Häfen; ändert sich
+                in einer Partie nicht) und Spielebene (Straßen, Gebäude, Räuber, Bauplätze)
+  Gelaende.tsx  Geländebilder und Verläufe, je einmal in <defs>, pro Feld per <use>
+  brett.css     Styles des Bretts, stil.css der Rest der Oberfläche
 tests/        Vitest: Brett, Regeln, Engine, Host, Simulation
 ```
 

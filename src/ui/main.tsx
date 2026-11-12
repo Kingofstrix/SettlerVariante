@@ -11,7 +11,9 @@ import { Lobby } from './Lobby';
 import { SpielAnsicht } from './Spiel';
 import { Start } from './Start';
 import { useSitzung, useToasts } from './hooks';
+import './tokens.css';
 import './stil.css';
+import './brett.css';
 
 const hostTransport = (): KanalHostTransport | PeerHostTransport => (DEV ? new KanalHostTransport() : new PeerHostTransport());
 const clientTransport = (): KanalClientTransport | PeerClientTransport => (DEV ? new KanalClientTransport() : new PeerClientTransport());

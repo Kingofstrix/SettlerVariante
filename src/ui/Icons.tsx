@@ -1,22 +1,14 @@
 // Eigene SVG-Symbole (24×24). Rohstoffe sind zusätzlich zur Farbe an der Form erkennbar.
 import type { JSX } from 'preact';
-import type { EntwTyp, Gelaende, Rohstoff } from '../engine';
+import type { EntwTyp, Rohstoff } from '../engine';
 
+/** Kartenfarbe je Rohstoff; die Werte stehen in tokens.css. */
 export const ROHSTOFF_FARBE: Record<Rohstoff, string> = {
-  holz: '#2f7d4f',
-  lehm: '#c2552d',
-  wolle: '#8cc152',
-  getreide: '#e8b730',
-  erz: '#7b8194',
-};
-
-export const GELAENDE_FARBE: Record<Gelaende, string> = {
-  wald: '#2f7d4f',
-  huegel: '#c8643c',
-  weide: '#9bcf62',
-  acker: '#efc648',
-  gebirge: '#8b90a3',
-  wueste: '#e3cf9c',
+  holz: 'var(--r-holz)',
+  lehm: 'var(--r-lehm)',
+  wolle: 'var(--r-wolle)',
+  getreide: 'var(--r-getreide)',
+  erz: 'var(--r-erz)',
 };
 
 export function rohstoffForm(typ: Rohstoff): JSX.Element {
@@ -136,11 +128,13 @@ const AUGEN: Record<number, [number, number][]> = {
 };
 
 export function Wuerfel({ wert, groesse = 44, rot = false }: { wert: number; groesse?: number; rot?: boolean }): JSX.Element {
+  // Wie die Felder: helle Oberseite auf dunkler Unterkante (ersetzt den früheren Schlagschatten-Filter).
   return (
-    <svg class="wuerfel" viewBox="0 0 24 24" width={groesse} height={groesse} role="img" aria-label={`Würfel ${wert}`}>
-      <rect x="1.5" y="1.5" width="21" height="21" rx="4.5" fill={rot ? '#c8372d' : '#fffaf0'} stroke="#3a2c1c" stroke-width="1.2" />
+    <svg class={`wuerfel ${rot ? 'rot' : ''}`} viewBox="0 0 24 24" width={groesse} height={groesse} role="img" aria-label={`Würfel ${wert}`}>
+      <rect x="1.5" y="3" width="21" height="20" rx="4.5" class="wuerfel-kante" />
+      <rect x="1.5" y="1" width="21" height="20" rx="4.5" class="wuerfel-flaeche" />
       {(AUGEN[wert] ?? []).map(([x, y]) => (
-        <circle cx={x} cy={y} r="2.1" fill={rot ? '#fff' : '#3a2c1c'} />
+        <circle cx={x} cy={y - 1} r="2.1" class="wuerfel-auge" />
       ))}
     </svg>
   );
