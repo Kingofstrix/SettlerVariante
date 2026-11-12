@@ -12,6 +12,8 @@ Wo jede Regel umgesetzt und getestet ist. Pfade relativ zu `src/engine/` bzw. `t
 | 6 und 8 nie benachbart (auch nicht 6/6, 8/8); neu mischen bis gültig | `brett.ts`: `belege`, `rotRegelOk` | „… 6/8-Regel …“ (200 Seeds je Größe), „rotRegelOk erkennt benachbarte 6/8“ |
 | Graph: Felder, Ecken, Kanten mit Nachbarschaftslisten, Axialkoordinaten | `brett.ts`: `baueGraph`, `kuestenKanten` | „kleines Brett: 19 Felder, 54 Ecken, 72 Kanten …“, „großes Brett: 30 Felder, 80 Ecken, 109 Kanten …“ |
 | Häfen an der Küste, keine geteilten Ecken | `brett.ts`: `setzeHaefen` | „… Häfen“ (2 Ecken je Hafen, alle verschieden) |
+| Weitere Karten (Zwillingsinseln, Spirale, Fjordland), je klein und groß; Gelände 4:4:4:3:3, 6/8-Regel, Häfen über die Küste verteilt; jede Insel mit allen Rohstoffen | `karten.ts`: `kartenFelder`; `brett.ts`: `gelaendeFuer`, `zahlenFuer`, `belegeFrei`, `setzeHaefenFrei`, `inseln` | `karten.test.ts` „Kartenformen“, „Belegung freier Karten“; `simulation.test.ts` „je 40 Zufallsspiele auf den neuen Karten …“ |
+| Abstimmung über die Karte: Mehrheit gewinnt, Los bei Gleichstand, ohne Stimmen Klassik | `karten.ts`: `zaehleStimmen`, `waehleKarte`; `netz/host.ts`: `setzeStimme`, `starten` | `karten.test.ts` „Abstimmung“; `host.test.ts` „Abstimmung über die Karte“ |
 
 ## Material
 
