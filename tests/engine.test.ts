@@ -629,3 +629,23 @@ describe('Glücksrad (Las Vegas)', () => {
     expect(gewonnen / n).toBeLessThan(0.34);
   });
 });
+
+describe('Würfelstatistik', () => {
+  it('zählt jeden Wurf je Augensumme, auch per Zeitablauf', () => {
+    let s = nachSetup(spiel(3));
+    expect(s.wurfStatistik).toEqual(Array(13).fill(0));
+    naechsterWurf(s, 8);
+    s = ok(s, { typ: 'WUERFELN', spieler: 0 });
+    expect(s.wurfStatistik[8]).toBe(1);
+    let wuerfe = 1;
+    for (let i = 0; i < 400; i++) {
+      const vorher = s.phase;
+      s = ok(s, { typ: 'ZEIT_ABGELAUFEN', spieler: 0 });
+      if (vorher === 'wuerfeln') wuerfe++;
+    }
+    const st = s.wurfStatistik;
+    expect(st.reduce((a, b) => a + b, 0)).toBe(wuerfe);
+    expect(st[0] + st[1]).toBe(0);
+    expect(sichtFuer(s, null).wurfStatistik).toEqual(st);
+  });
+});

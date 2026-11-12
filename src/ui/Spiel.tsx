@@ -26,6 +26,7 @@ import { useKartenFluege } from './animation';
 import { ChatEingabe, ChatVerlauf } from './Chat';
 import { AngebotsListe, BankAnzeige, LogListe, SpielerTafel, TimerBalken, WurfAnzeige, statusText } from './Teile';
 import { GluecksradBuehne, useGluecksrad } from './Gluecksrad';
+import { WuerfelStatistik } from './Statistik';
 import { WuerfelBuehne, useWuerfelAnimation } from './WuerfelBuehne';
 import { toast, useRestzeit, useSitzung } from './hooks';
 import { setzeTon, ton, tonAn } from './ton';
@@ -371,6 +372,8 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
 
       {sicht.phase === 'abwerfen' && sicht.abwerfen[ich] !== undefined && (
         <AbwerfenMitRestzeit
+          // Neu aufbauen, wenn ein anderer Spieler (Hot-Seat) oder ein neues Soll (Glücksrad) dran ist
+          key={`${ich}:${sicht.abwerfen[ich]}`}
           sicht={sicht}
           aktion={aktion}
           timer={z.timer}
@@ -534,7 +537,7 @@ export function Menue({ sitzung, z, onZu, onVerlassen }: { sitzung: Sitzung; z: 
 
 /** Seitenleiste unten: Spielverlauf und Chat als Reiter, mit Zähler für ungelesene Nachrichten. */
 export function VerlaufUndChat({ z, sitzung }: { z: SitzungsZustand; sitzung: Sitzung }): JSX.Element {
-  const [reiter, setReiter] = useState<'log' | 'chat'>('log');
+  const [reiter, setReiter] = useState<'log' | 'chat' | 'statistik'>('log');
   const letzte = z.chat.at(-1)?.nr ?? 0;
   const [gelesen, setGelesen] = useState(letzte);
   const sicht = z.sicht!;
@@ -558,19 +561,30 @@ export function VerlaufUndChat({ z, sitzung }: { z: SitzungsZustand; sitzung: Si
   }, [letzte]);
 
   const ungelesen = z.chat.filter((c) => c.nr > gelesen && c.name !== meinName).length;
-  if (!mitChat) return <LogListe sicht={sicht} />;
   return (
-    <div class="verlauf-chat">
+    <div class={`verlauf-chat ${reiter === 'statistik' ? 'aufgeklappt' : ''}`}>
       <div class="reiter" role="tablist">
         <button role="tab" aria-selected={reiter === 'log'} class={`reiter-knopf ${reiter === 'log' ? 'an' : ''}`} onClick={() => setReiter('log')}>
           Verlauf
         </button>
-        <button role="tab" aria-selected={reiter === 'chat'} class={`reiter-knopf ${reiter === 'chat' ? 'an' : ''}`} onClick={() => setReiter('chat')}>
-          Chat {ungelesen > 0 && <span class="zaehler-punkt">{ungelesen}</span>}
+        {mitChat && (
+          <button role="tab" aria-selected={reiter === 'chat'} class={`reiter-knopf ${reiter === 'chat' ? 'an' : ''}`} onClick={() => setReiter('chat')}>
+            Chat {ungelesen > 0 && <span class="zaehler-punkt">{ungelesen}</span>}
+          </button>
+        )}
+        <button
+          role="tab"
+          aria-selected={reiter === 'statistik'}
+          class={`reiter-knopf ${reiter === 'statistik' ? 'an' : ''}`}
+          onClick={() => setReiter('statistik')}
+        >
+          Statistik
         </button>
       </div>
       {reiter === 'log' ? (
         <LogListe sicht={sicht} />
+      ) : reiter === 'statistik' ? (
+        <WuerfelStatistik sicht={sicht} />
       ) : (
         <div class="chat">
           <ChatVerlauf eintraege={z.chat} meinName={meinName} />

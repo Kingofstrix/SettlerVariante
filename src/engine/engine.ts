@@ -112,6 +112,7 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
     gluecksrad: [],
     gluecksradNr: 0,
     gedreht: [],
+    wurfStatistik: Array<number>(13).fill(0),
   };
   log(s, `Spiel gestartet (Seed ${s.seed}). Reihenfolge: ${s.spieler.map((p) => p.name).join(', ')}.`);
   log(s, `Gründungsphase: ${s.spieler[0].name} setzt die erste Siedlung.`);
@@ -148,6 +149,7 @@ function klon(s: GameState): GameState {
     bewegungen: s.bewegungen.slice(),
     gluecksrad: s.gluecksrad.slice(),
     gedreht: s.gedreht.slice(),
+    wurfStatistik: s.wurfStatistik.slice(),
   };
 }
 
@@ -378,6 +380,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       const w: [number, number] = [zufallInt(s, 6) + 1, zufallInt(s, 6) + 1];
       s.wurf = w;
       const zahl = w[0] + w[1];
+      s.wurfStatistik[zahl]++;
       if (zahl === 7) {
         s.abwerfen = {};
         s.gedreht = [];
