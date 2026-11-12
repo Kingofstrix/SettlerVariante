@@ -5,6 +5,7 @@ import {
   amZug,
   anwenden,
   istKarte,
+  leereStatistik,
   neuesSpiel,
   sichtFuer,
   waehleKarte,
@@ -15,6 +16,7 @@ import {
   type RngTraeger,
   type Rohstoff,
 } from '../engine';
+import { partieAus, partien, uebernimm } from './rangliste';
 import { PROTOKOLL_VERSION, pruefeClientNachricht, type EndeGrund, type HostNachricht, type SichtOhneBrett } from './protokoll';
 import {
   Beobachtbar,
@@ -57,13 +59,15 @@ export function pruefeHostDaten(d: unknown): HostDaten | null {
   if (typeof x.einstellungen !== 'object' || x.einstellungen === null) return null;
   if (x.spiel !== null && (typeof x.spiel !== 'object' || !Array.isArray(x.spiel.spieler) || !x.spiel.brett)) return null;
   if (!x.sitze.every((s) => s && typeof s.token === 'string' && typeof s.name === 'string' && typeof s.farbe === 'string')) return null;
-  // Ältere Spielstände ohne Bewegungsliste ergänzen
+  // Ältere Spielstände ohne Bewegungsliste, Statistik, Wunschliste oder neue Einstellungen ergänzen
   const spiel = x.spiel
     ? {
         ...x.spiel,
         config: { ...STANDARD_CONFIG, ...x.spiel.config },
+        spieler: x.spiel.spieler.map((p) => ({ ...p, wunsch: p.wunsch ?? { suche: [], biete: [] } })),
         bewegungen: x.spiel.bewegungen ?? [],
         bewegungNr: x.spiel.bewegungNr ?? 0,
+        statistik: x.spiel.statistik ?? leereStatistik(x.spiel.spieler.length),
         gluecksrad: x.spiel.gluecksrad ?? [],
         gluecksradNr: x.spiel.gluecksradNr ?? 0,
         gedreht: x.spiel.gedreht ?? [],
@@ -265,6 +269,9 @@ export class Host extends Beobachtbar implements Sitzung {
           g.letzterPong = Date.now();
           return;
         }
+        case 'rangliste':
+          if (g.rolle && uebernimm(n.partien)) this.sendeRangliste();
+          return;
         case 'chat':
           if (g.rolle !== 'spieler' || !g.token) return;
           g.chatZeiten = g.chatZeiten.filter((t) => Date.now() - t < 10000);
@@ -315,6 +322,7 @@ export class Host extends Beobachtbar implements Sitzung {
       g.rolle = 'beamer';
       g.token = token;
       this.sendeChat(g);
+      this.sendeRangliste(g);
       return this.rundsenden();
     }
     const bekannt = this.daten.sitze.some((s) => s.token === token);
@@ -333,6 +341,21 @@ export class Host extends Beobachtbar implements Sitzung {
     this.speichern();
     this.rundsenden();
     this.sendeChat(g);
+    this.sendeRangliste(g);
+  }
+
+  // ---------- Rangliste ----------
+
+  /** An einen Gast oder an alle. */
+  private sendeRangliste(nur?: Gast): void {
+    const n: HostNachricht = { v: PROTOKOLL_VERSION, t: 'rangliste', partien: partien() };
+    for (const g of nur ? [nur] : this.gaeste) if (g.rolle) this.sende(g, n);
+  }
+
+  /** Beendete Partie einmalig in die Rangliste eintragen und verteilen. */
+  private pruefeEnde(): void {
+    const s = this.daten.spiel;
+    if (s?.phase === 'ende' && uebernimm([partieAus(s, this.daten.raumCode)])) this.sendeRangliste();
   }
 
   // ---------- Chat ----------
@@ -495,6 +518,7 @@ export class Host extends Beobachtbar implements Sitzung {
     const e = anwenden(s, { ...absicht, spieler } as Parameters<typeof anwenden>[1]);
     if (!e.ok) return e.fehler;
     this.daten.spiel = e.state;
+    this.pruefeEnde();
     this.timerAktualisieren();
     this.speichern();
     this.rundsenden();
@@ -571,6 +595,8 @@ export class Host extends Beobachtbar implements Sitzung {
         layout: d.einstellungen.layout,
         siegpunkte: d.einstellungen.siegpunkte,
         freundlicherRaeuber: d.einstellungen.freundlicherRaeuber,
+        sonderbauphase: d.einstellungen.sonderbauphase,
+        abwurfGrenze: d.einstellungen.abwurfGrenze,
         gluecksrad: d.einstellungen.gluecksrad,
       },
     });
@@ -668,6 +694,7 @@ export class Host extends Beobachtbar implements Sitzung {
       this.daten.spiel = e.state;
       if (e.state.phase === 'ende' || schritt(e.state)[0] !== t.schluessel) break;
     }
+    this.pruefeEnde();
     this.timerAktualisieren();
     this.speichern();
     this.rundsenden();

@@ -7,6 +7,7 @@ Browser-Mehrspielerspiel für 3–6 Personen nach dem Prinzip „siedeln, handel
 - Standardregeln plus 5–6-Spieler-Erweiterung mit **Sonderbauphase**, Zugtimer, Beameransicht.
 - **Vier Karten** (Klassik, Zwillingsinseln, Spirale, Fjordland), über die in der Lobby **abgestimmt** wird.
 - **Bankübersicht** (Karten je Rohstoff in der Bank und bei den Spielern), **Chat**, gut sichtbare **Handelsangebote**, **Würfel in der Brettmitte** und **Kartenflug-Animationen** zwischen Hand, Bank und Mitspielern.
+- **Rangliste der Feigen Sippe** auf der Startseite und in der Lobby, **Statistik und Titel** am Spielende, **Suche/Biete-Wunschtafel**, Hinweise auf **unmögliche Handel**, hervorgehobene **neue Bauten** und **Ertragsfelder**, Verlauf nach Zügen.
 
 Namen, Grafiken und Texte sind eigene; nur die Spielmechanik orientiert sich am bekannten Brettspiel.
 
@@ -57,6 +58,12 @@ Im Spiel:
 - **Las Vegas (Glücksrad):** Muss man bei einer 7 abwerfen, darf man stattdessen am Glücksrad drehen. 30 %: nichts abwerfen. 70 %: doppelt so viele Karten abwerfen (höchstens die ganze Hand; ist es die ganze Hand, ist sie sofort weg). Pro 7 nur ein Dreh. Den Zufall zieht der Host, das Rad landet passend dazu. Nach einem Dreh beginnt die Abwurfzeit neu. Der Beamer zeigt jeden Dreh groß, die anderen Spieler bekommen eine Einblendung. Abschaltbar in der Lobby.
 - **Statistik:** Reiter „Statistik“ neben Verlauf und Chat. Ein Balkendiagramm zeigt, wie oft jede Augensumme (2–12) in der laufenden Partie gefallen ist. Die gestrichelte Linie ist der statistisch erwartete Wert bei dieser Zahl an Würfen, der letzte Wurf ist gold markiert. Beim Überfahren eines Balkens stehen Anzahl, Anteil und Erwartung oben. Der Bereich klappt dafür über Bank und Baumenü auf.
 - **Chat:** Reiter „Chat“ neben dem Verlauf (auch in der Lobby). Ungelesene Nachrichten zeigt eine Zahl am Reiter. Höchstens 5 Nachrichten in 10 Sekunden pro Person, 200 Zeichen je Nachricht. Der Beamer liest nur mit.
+- **Mitspieler im Blick:** Baut jemand eine Siedlung oder Stadt, kauft eine Entwicklungskarte oder versetzt den Räuber, gibt es einen Hinweis mit eigenem Ton. Neue Bauten der anderen fallen animiert aufs Brett und bleiben bis zum Ende deines nächsten Zugs markiert. Gewürfelte Felder leuchten auf, die Rohstoffe fliegen von dort zu den Spielern.
+- **Verlauf:** nach Zügen gruppiert, mit Symbolen. Ein Klick auf einen Bau oder Räuberzug zeigt die Stelle auf dem Brett. Unter jedem Spieler zeigt ein dünner Balken den Weg bis zum Sieg.
+- **Suche/Biete:** Über „📣 Suche/Biete“ zeigt jede:r allen, welche Rohstoffe gesucht und geboten werden. Die Wünsche stehen unten links auf dem Brett (auch am Beamer), bis man sie ändert.
+- **Unmögliche Handel:** Im Handelsdialog steht unter einem Rohstoff „sonst hat niemand …“, wenn alle übrigen Karten in der Bank und deiner Hand liegen; ein Angebot dafür lässt sich nicht senden (die Bank geht weiter). Mitspieler ohne Karten sind als Empfänger ausgegraut.
+- **Spielende:** Podest, Punkteverlauf, Würfelverteilung (gewürfelt gegen erwartet), Würfelertrag, Tauschvorgänge, Diebstähle und Titel (Räuberbaron, Handelsfürst, Pechvogel). Der Host startet mit „Revanche“ wieder die Lobby.
+- **Rangliste:** Jede online zu Ende gespielte Partie zählt (Hot-Seat nicht). Es gibt keinen Server: Jedes Gerät speichert die Liste selbst, beim Verbinden gleichen Host und Mitspieler sie ab. Spieler werden am Namen erkannt (Groß-/Kleinschreibung egal) – also immer denselben Namen nehmen.
 - **Animationen:** Karten fliegen zwischen Hand, Bank und Mitspielern. Bei fremden Spielern ist nur dann zu sehen, welcher Rohstoff fliegt, wenn die Bank beteiligt ist (das ist ohnehin öffentlich). Diebstahl und Handel zwischen zwei anderen zeigen verdeckte Karten. Mit „Bewegung reduzieren“ im Betriebssystem sind alle Animationen aus.
 
 Tipps:
@@ -191,7 +198,7 @@ Grundsätze:
 Regeln, die im Auftrag offen waren, sind so umgesetzt:
 
 1. **Anfänger-Layout**: eigenes festes, ausgeglichenes Layout (per fester Suche erzeugt), nicht die Originalaufstellung.
-2. **Varianten** in der Lobby: Siegpunkte 8/10/12, „Freundlicher Räuber“ (Spieler mit höchstens 2 sichtbaren Punkten sind geschützt) und „Las Vegas“ (Glücksrad bei 7). Standard: 10 Punkte, Räuber normal, Glücksrad an.
+2. **Varianten** in der Lobby: Siegpunkte 8/10/12, „Freundlicher Räuber“ (Spieler mit höchstens 2 sichtbaren Punkten sind geschützt), „Las Vegas“ (Glücksrad bei 7), Sonderbauphase an/aus (nur 5–6 Spieler) und Abwerfen bei einer 7 ab mehr als 7 oder mehr als 9 Karten. Standard: 10 Punkte, Räuber normal, Glücksrad an, Sonderbauphase an, mehr als 7.
 3. **Sonderbauphase**: Wer mit seiner Hand nichts bauen oder kaufen kann, wird automatisch übersprungen. Das spart viel Zeit, verrät aber minimal etwas über die Hand. Abschaltbar über `sonderbauAutoSkip` in der Spielkonfiguration (`src/engine/typen.ts`).
 4. **Sieg in der Sonderbauphase** gibt es nicht: Wer dort 10 Punkte erreicht, gewinnt zu Beginn seines eigenen Zugs.
 5. **Bestehlen**: Gibt es nur einen möglichen Betroffenen, wird direkt gezogen; bei mehreren wählt der Spieler.

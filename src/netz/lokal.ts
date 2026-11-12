@@ -15,7 +15,15 @@ export class LokalSitzung extends Beobachtbar implements Sitzung {
     this.spiel = neuesSpiel({
       spieler,
       seed: zufallsSeed(),
-      config: { karte, layout: einstellungen.layout, siegpunkte: einstellungen.siegpunkte, freundlicherRaeuber: einstellungen.freundlicherRaeuber, gluecksrad: einstellungen.gluecksrad },
+      config: {
+        karte,
+        layout: einstellungen.layout,
+        siegpunkte: einstellungen.siegpunkte,
+        freundlicherRaeuber: einstellungen.freundlicherRaeuber,
+        sonderbauphase: einstellungen.sonderbauphase,
+        abwurfGrenze: einstellungen.abwurfGrenze,
+        gluecksrad: einstellungen.gluecksrad,
+      },
     });
     this.wer = amZug(this.spiel)[0] ?? 0;
     this.zustand = {

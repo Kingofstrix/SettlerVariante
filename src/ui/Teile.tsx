@@ -1,11 +1,12 @@
 // Bausteine, die Spieler- und Beameransicht gemeinsam nutzen.
 import type { JSX } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
-import { ROHSTOFFE, ROHSTOFF_NAME, kartenProRohstoff, type Handelsangebot, type Rohstoffe, type Sicht } from '../engine';
+import { ROHSTOFFE, ROHSTOFF_NAME, kartenProRohstoff, type Handelsangebot, type Ort, type Rohstoffe, type Sicht, type SichtLog } from '../engine';
 import { farbHex, type Absicht, type TimerAnzeige } from '../netz/sitzung';
 import { RohstoffListe } from './Dialoge';
 import { useRestzeit } from './hooks';
 import { EntwIcon, KartenIcon, RohstoffIcon, Wuerfel } from './Icons';
+import { logSymbol, zugSpieler } from './verlauf';
 
 /** Kurzer Text, was gerade passiert. */
 export function statusText(sicht: Sicht): { text: string; ich: boolean } {
@@ -99,6 +100,9 @@ export function SpielerTafel({ sicht, verbunden }: { sicht: Sicht; verbunden: bo
             <div class="spunkte" data-tip={p.id === sicht.ich ? 'Deine Siegpunkte (inkl. verdeckter Karten)' : 'Sichtbare Siegpunkte'}>
               {punkte}
             </div>
+            <div class="sfortschritt" data-tip={`${punkte} von ${sicht.config.siegpunkte} Siegpunkten`}>
+              <i style={{ width: `${Math.min(100, (punkte / sicht.config.siegpunkte) * 100)}%`, background: farbHex(p.farbe) }} />
+            </div>
           </div>
         );
       })}
@@ -106,18 +110,85 @@ export function SpielerTafel({ sicht, verbunden }: { sicht: Sicht; verbunden: bo
   );
 }
 
-export function LogListe({ sicht, max }: { sicht: Sicht; max?: number }): JSX.Element {
+/** Wunschtafel unten links auf dem Brett: wer was sucht und bietet. Nur sichtbar, wenn jemand einen Wunsch hat. */
+export function WunschTafel({ sicht }: { sicht: Sicht }): JSX.Element | null {
+  const mit = sicht.spieler.filter((p) => p.wunsch && p.wunsch.suche.length + p.wunsch.biete.length > 0);
+  if (mit.length === 0 || sicht.phase === 'ende') return null;
+  return (
+    <div class="wunschtafel" aria-label="Suche / Biete">
+      <b class="wunschtafel-titel">📣 Suche / Biete</b>
+      {mit.map((p) => (
+        <div class="wunschtafel-zeile">
+          <span class="wunschtafel-name">
+            <i class="punkt" style={{ background: farbHex(p.farbe) }} /> {p.id === sicht.ich ? 'Du' : p.name}
+          </span>
+          {p.wunsch.suche.length > 0 && (
+            <span data-tip={`sucht ${p.wunsch.suche.map((r) => ROHSTOFF_NAME[r]).join(', ')}`}>
+              sucht {p.wunsch.suche.map((r) => <RohstoffIcon typ={r} groesse={24} />)}
+            </span>
+          )}
+          {p.wunsch.biete.length > 0 && (
+            <span data-tip={`bietet ${p.wunsch.biete.map((r) => ROHSTOFF_NAME[r]).join(', ')}`}>
+              bietet {p.wunsch.biete.map((r) => <RohstoffIcon typ={r} groesse={24} />)}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Eine Logzeile mit Symbol und Farbpunkt; mit Ort und onOrt klickbar. */
+export function LogZeile({ sicht, l, onOrt }: { sicht: Sicht; l: SichtLog; onOrt?: (o: Ort) => void }): JSX.Element {
+  const klick = l.ort && onOrt ? () => onOrt(l.ort!) : undefined;
+  return (
+    <p key={l.nr} class={klick ? 'klickbar' : ''} onClick={klick} data-tip={klick ? 'Auf dem Brett zeigen' : undefined}>
+      <span class="log-symbol" aria-hidden="true">
+        {logSymbol(l.text)}
+      </span>
+      {l.wer !== undefined && <i class="punkt" style={{ background: farbHex(sicht.spieler[l.wer].farbe) }} />} {l.text}
+    </p>
+  );
+}
+
+/** Verlauf, gruppiert nach Zügen. Ein Klick auf eine Zeile mit Ort zeigt die Stelle auf dem Brett. */
+export function LogListe({ sicht, max, onOrt }: { sicht: Sicht; max?: number; onOrt?: (o: Ort) => void }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const letzte = sicht.log.at(-1)?.nr;
   useEffect(() => {
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   }, [letzte]);
-  const zeilen = max ? sicht.log.slice(-max) : sicht.log;
+  // "X ist am Zug." steht schon im Gruppenkopf
+  const zeilen = (max ? sicht.log.slice(-max) : sicht.log).filter((l) => l.zug === undefined || !/ ist am Zug\.$/.test(l.text));
+  const gruppen: { zug: number | undefined; zeilen: SichtLog[] }[] = [];
+  for (const l of zeilen) {
+    const g = gruppen.at(-1);
+    if (g && g.zug === l.zug) g.zeilen.push(l);
+    else gruppen.push({ zug: l.zug, zeilen: [l] });
+  }
   return (
     <div class="log" ref={ref} aria-live="polite">
-      {zeilen.map((l) => (
-        <p key={l.nr}>{l.text}</p>
-      ))}
+      {gruppen.map((g) => {
+        const wer = g.zug === undefined ? null : zugSpieler(sicht, g.zug);
+        return (
+          <div class="log-zug" key={`${g.zug}-${g.zeilen[0].nr}`}>
+            {g.zug !== undefined && (
+              <h4>
+                {wer === null ? (
+                  'Gründung'
+                ) : (
+                  <>
+                    <i class="punkt" style={{ background: farbHex(sicht.spieler[wer].farbe) }} /> Zug {g.zug} · {sicht.spieler[wer].name}
+                  </>
+                )}
+              </h4>
+            )}
+            {g.zeilen.map((l) => (
+              <LogZeile sicht={sicht} l={l} onOrt={onOrt} />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { FARBEN } from '../netz/sitzung';
 import { DEV, codeGueltig, lese, normalisiereCode, schreibe, type Profil } from '../netz/speicher';
 import type { NetzOverride } from '../netz/transport';
 import { HilfeDialog } from './Dialoge';
+import { Rangliste } from './Rangliste';
 
 export interface StartAktionen {
   erstellen(profil: Profil): void;
@@ -159,6 +160,9 @@ export function Start({ aktionen, fehler, laedt }: { aktionen: StartAktionen; fe
             Regeln ansehen
           </button>
         </p>
+      </div>
+      <div class="start-rangliste">
+        <Rangliste />
       </div>
       {hilfe && <HilfeDialog onZu={() => setHilfe(false)} />}
     </div>
