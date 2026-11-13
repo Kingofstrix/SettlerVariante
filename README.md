@@ -78,9 +78,9 @@ Tipps:
 | Karte | Form | Felder (3–4 / 5–6 Spieler) |
 |---|---|---|
 | Klassik | das bekannte Sechseck | 19 / 30 |
-| Zwillingsinseln | zwei Inseln ohne Landverbindung | 26 / 38 |
-| Spirale | ein zwei Felder breiter Arm um einen Kern, dazwischen eine Rinne | 33 / 39 |
-| Fjordland | eine Insel mit tiefen Buchten | 25 / 37 |
+| Zwillingsinseln | zwei Inseln ohne Landverbindung | 26 / 52 |
+| Spirale | ein Arm um einen Kern (groß: links drei Felder breit), dazwischen eine Rinne | 33 / 54 |
+| Fjordland | eine Insel mit tiefen Buchten | 25 / 53 |
 
 - **Abstimmung:** Jeder Spieler hat in der Lobby eine Stimme und kann sie bis zum Start ändern. Beim Start gewinnt die Karte mit den
   meisten Stimmen. Bei Gleichstand entscheidet das Los unter den führenden Karten, ohne Stimmen wird Klassik gespielt. Das Ergebnis
@@ -93,7 +93,7 @@ Tipps:
   mehr Felder, die Bank wird dort also eher knapp.
 - **Lokal ausprobieren:** Startseite → „Lokal an einem Gerät spielen“ → Karte wählen.
 - **Neue Karte anlegen:** in `src/engine/karten.ts` eine Form aus Textzeilen eintragen (X = Land), Name und Text ergänzen.
-  Vorschau, Abstimmung und Brett kommen von selbst. Höchstens sieben Zeilen, sonst werden die Felder kleiner als auf Klassik.
+  Vorschau, Abstimmung und Brett kommen von selbst. Klein höchstens sieben, groß höchstens acht Zeilen; jede weitere Zeile macht die Felder kleiner.
 
 ## Netzwerk: eduroam, TURN und der Hotspot-Plan
 

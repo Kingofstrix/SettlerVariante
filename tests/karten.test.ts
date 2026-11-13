@@ -58,18 +58,18 @@ function pruefeGraph(b: Brett): void {
 
 describe('Kartenformen', () => {
   const erwartet: Record<Exclude<KartenId, 'klassik'>, { klein: number; gross: number; inseln: number }> = {
-    zwillinge: { klein: 26, gross: 38, inseln: 2 },
-    spirale: { klein: 33, gross: 39, inseln: 1 },
-    fjorde: { klein: 25, gross: 37, inseln: 1 },
+    zwillinge: { klein: 26, gross: 52, inseln: 2 },
+    spirale: { klein: 33, gross: 54, inseln: 1 },
+    fjorde: { klein: 25, gross: 53, inseln: 1 },
   };
   for (const karte of NEUE) {
     for (const gross of [false, true]) {
-      it(`${karte} ${gross ? 'groß' : 'klein'}: Feldzahl, Inseln, gültiger Graph, höchstens sieben Zeilen, keine Binnenseen`, () => {
+      it(`${karte} ${gross ? 'groß' : 'klein'}: Feldzahl, Inseln, gültiger Graph, höchstens sieben (klein) bzw. acht Zeilen (groß), keine Binnenseen`, () => {
         const koord = feldKoordinaten(karte, gross);
         expect(new Set(koord.map(String)).size).toBe(koord.length); // kein Feld doppelt
         expect(koord.length).toBe(gross ? erwartet[karte].gross : erwartet[karte].klein);
         const rs = koord.map((k) => k[1]);
-        expect(Math.max(...rs) - Math.min(...rs)).toBeLessThanOrEqual(6);
+        expect(Math.max(...rs) - Math.min(...rs)).toBeLessThanOrEqual(gross ? 7 : 6);
         expect(binnenseen(koord)).toBe(0);
         const b = baueGraph(gross, koord);
         pruefeGraph(b);
@@ -95,7 +95,7 @@ describe('Belegung freier Karten', () => {
     expect(gelaendeFuer(19).sort()).toEqual(
       [...Array(4).fill('wald'), ...Array(4).fill('weide'), ...Array(4).fill('acker'), ...Array(3).fill('huegel'), ...Array(3).fill('gebirge'), 'wueste'].sort(),
     );
-    for (let n = 19; n <= 45; n++) {
+    for (let n = 19; n <= 56; n++) {
       const g = gelaendeFuer(n);
       expect(g.length).toBe(n);
       const anzahl = ROHSTOFF_GELAENDE.map((a) => g.filter((x) => x === a).length);
