@@ -184,7 +184,8 @@ export function feldKoordinaten(karte: KartenId, gross: boolean): [number, numbe
 
 /** Gelände für n Felder im Verhältnis des Grundspiels (4:4:4:3:3), dazu 1–3 Wüsten. */
 export function gelaendeFuer(n: number): Gelaende[] {
-  const wuesten = n < 28 ? 1 : n < 42 ? 2 : 3;
+  // Höchstens zwei Wüsten: Auf den Zwillingsinseln bekommt jede Insel höchstens eine.
+  const wuesten = n < 28 ? 1 : 2;
   const p = n - wuesten;
   const arten: [Gelaende, number][] = [['wald', 4], ['weide', 4], ['acker', 4], ['huegel', 3], ['gebirge', 3]];
   const genau = arten.map(([, anteil]) => (p * anteil) / 18);

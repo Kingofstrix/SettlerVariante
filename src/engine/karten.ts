@@ -1,6 +1,7 @@
 // Kartenformen: welche Felder Land sind. Gelände, Zahlen und Häfen verteilt brett.ts.
 // Jede Karte gibt es in zwei Größen: klein für 3–4, groß für 5–6 Spieler.
-// Keine Karte ist höher als sieben Zeilen: So bleiben die Felder so groß wie auf dem großen Klassik-Brett.
+// Die kleinen Fassungen sind höchstens sieben Zeilen hoch, die großen höchstens acht. Die großen haben
+// gut 50 Felder, damit sich sechs Spieler nicht gegenseitig einmauern; ihre Felder sind dafür etwas kleiner.
 
 export const KARTEN = ['klassik', 'zwillinge', 'spirale', 'fjorde'] as const;
 export type KartenId = (typeof KARTEN)[number];
@@ -50,16 +51,18 @@ const FORMEN: Record<Exclude<KartenId, 'klassik'>, { klein: string[]; gross: str
       '......XX..',
     ],
     gross: [
-      '.XX....XXX.',
-      'XXX...XXXX.',
-      'XXXX...XXXX',
-      'XXX...XXXX.',
-      '.XX...XXXX.',
-      '......XXX..',
-      '.......XX..',
+      '.XXX...XXX..',
+      'XXXX..XXXXX.',
+      'XXXX...XXXXX',
+      'XXXX..XXXXX.',
+      '.XXX..XXXXX.',
+      '.XX...XXXX..',
+      '......XXX...',
+      '......XX....',
     ],
   },
-  // Ein zwei Felder breiter Arm läuft vom Kern aus einmal um die Mitte und endet unten rechts.
+  // Ein Arm läuft vom Kern aus einmal um die Mitte und endet unten rechts. Klein ist er zwei Felder
+  // breit, groß an der linken Seite drei, damit man auch mit sechs Spielern außen herum kommt.
   // Die Rinne zwischen den Windungen ist nach Osten zum Meer offen.
   spirale: {
     klein: [
@@ -72,13 +75,14 @@ const FORMEN: Record<Exclude<KartenId, 'klassik'>, { klein: string[]; gross: str
       '.XXXXX.',
     ],
     gross: [
-      '.XXXXXX.',
-      'XXXXXXX.',
-      'XX....XX',
-      'XX.XXXXX',
-      'XX......',
-      'XXXXXXX.',
-      '.XXXXXX.',
+      '.XXXXXXX..',
+      'XXXXXXXXX.',
+      'XXX....XXX',
+      'XXX.XX.XXX',
+      'XXX.XXXXX.',
+      'XXX.......',
+      'XXXXXXXX..',
+      '.XXXXX....',
     ],
   },
   // Eine Insel mit Buchten, die tief ins Land reichen. Keine Bucht ist vom Meer abgeschnitten.
@@ -91,12 +95,14 @@ const FORMEN: Record<Exclude<KartenId, 'klassik'>, { klein: string[]; gross: str
       '.X.XXX.',
     ],
     gross: [
-      '..XX.XXX.',
-      '.XXX.XXX.',
-      '.XXXX.XXX',
-      'XXXXXXX.X',
-      '.X.XXXXX.',
-      '.X.XX.XX.',
+      '..XX.XX...',
+      '.XXX.XXXX.',
+      '.XXXX.XXXX',
+      'XXXXXXX...',
+      'XX.XXXXXXX',
+      '.X.XXX.XXX',
+      'XX.XXX.XX.',
+      '.X..XX..X.',
     ],
   },
 };
