@@ -54,7 +54,7 @@ export function BeamerAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVe
         <BankAnzeige sicht={sicht} />
         <LogListe sicht={sicht} max={12} />
       </aside>
-      {dialog === 'hilfe' && <HilfeDialog onZu={() => setDialog(null)} />}
+      {dialog === 'hilfe' && <HilfeDialog variante={sicht.config.variante} onZu={() => setDialog(null)} />}
       {dialog === 'menue' && <Menue sitzung={sitzung} z={z} onZu={() => setDialog(null)} onVerlassen={onVerlassen} />}
       {rad.anzeige && <GluecksradBuehne key={rad.anzeige.id} anzeige={rad.anzeige} onFertig={rad.fertig} eilig={rad.wartend > 0} />}
       {sicht.phase === 'ende' && <EndeDialog sitzung={sitzung} sicht={sicht} onVerlassen={onVerlassen} />}

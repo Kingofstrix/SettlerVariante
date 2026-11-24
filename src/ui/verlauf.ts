@@ -9,6 +9,11 @@ export function zugSpieler(sicht: Sicht, zug: number): number | null {
 /** Symbol für eine Logzeile. */
 export function logSymbol(text: string): string {
   if (/gewinnt|Längste Handelsstraße/.test(text)) return '🏆';
+  if (/neue Insel/.test(text)) return '🏝️';
+  if (/Nebel|Ertrag/.test(text)) return '🌫️';
+  if (/Piraten/.test(text)) return '🏴‍☠️';
+  if (/Gold/.test(text) && !/würfelt/.test(text)) return '✨';
+  if (/Schiff/.test(text)) return '⛵';
   if (/Rittermacht|Ritter/.test(text)) return '⚔️';
   if (/würfelt/.test(text)) return '🎲';
   if (/Räuber|stiehlt/.test(text)) return '🦹';

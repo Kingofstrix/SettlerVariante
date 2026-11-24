@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baueGraph, erzeugeBrett, kuestenKanten, rotRegelOk, type Brett, type Gelaende } from '../src/engine';
+import { baueGraph, erzeugeBrett, kuestenKanten, rotRegelOk, type Brett } from '../src/engine';
 
 function zaehle<T>(l: T[]): Map<T, number> {
   const m = new Map<T, number>();
@@ -53,7 +53,7 @@ describe('Brettgenerierung', () => {
         for (let seed = 1; seed <= (layout === 'zufall' ? 200 : 2); seed++) {
           const b = erzeugeBrett(gross, layout, { rngState: seed });
           const g = zaehle(b.hexes.map((h) => h.gelaende));
-          for (const art of ['wald', 'weide', 'acker', 'huegel', 'gebirge', 'wueste'] as Gelaende[]) expect(g.get(art)).toBe(e[art]);
+          for (const art of ['wald', 'weide', 'acker', 'huegel', 'gebirge', 'wueste'] as const) expect(g.get(art)).toBe(e[art]);
           const zahlen = b.hexes.filter((h) => h.zahl !== null);
           expect(zahlen.length).toBe(e.zahlen);
           for (const h of b.hexes) expect(h.zahl === null).toBe(h.gelaende === 'wueste');

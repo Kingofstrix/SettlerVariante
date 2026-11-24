@@ -120,6 +120,34 @@ describe('Lobby', () => {
   });
 });
 
+describe('Nebel des Krieges über das Netz', () => {
+  it('extrem: jeder Gast bekommt nur seine Felder, das Brett kommt neu, sobald sich der Nebel lichtet', async () => {
+    const { t, h, g } = await raum(2, { nebel: 'extrem' });
+    const beamer = t.gast('beamer-token-1', 'Beamer', 'beamer');
+    h.host.starten();
+    const brettVon = (x: typeof g[number]) =>
+      x.empfangen.filter((n): n is Extract<HostNachricht, { t: 'spiel' }> => n.t === 'spiel' && !!n.sicht.brett).at(-1)!.sicht.brett!;
+    const sitzVon = (i: number): number => zustand(h).spieler.findIndex((p) => p.name === `Gast${i}`);
+    // Am Anfang ist alles Land verdeckt
+    expect(brettVon(g[0]).hexes.every((x) => x.gelaende === 'nebel' && x.zahl === null)).toBe(true);
+    const anzahlBretter = g[0].empfangen.filter((n) => n.t === 'spiel' && n.sicht.brett).length;
+    const s = bis(h, (x) => x.phase !== 'setup');
+    expect(g[0].empfangen.filter((n) => n.t === 'spiel' && n.sicht.brett).length).toBeGreaterThan(anzahlBretter);
+    const ich = sitzVon(0);
+    const meine = new Set(Object.entries(s.gebaeude).filter(([, x]) => x.spieler === ich).flatMap(([e]) => s.brett.ecken[Number(e)].hexes));
+    const alle = new Set(Object.keys(s.gebaeude).flatMap((e) => s.brett.ecken[Number(e)].hexes));
+    for (const x of brettVon(g[0]).hexes) {
+      expect(x.gelaende === 'nebel').toBe(!meine.has(x.id));
+      if (meine.has(x.id)) expect(x.zahl).toBe(s.brett.hexes[x.id].zahl);
+    }
+    for (const x of brettVon(beamer).hexes) expect(x.gelaende === 'nebel').toBe(!alle.has(x.id));
+    // Die Start-Rohstoffe der anderen stehen nicht im Klartext im Verlauf
+    const fremd = g[0].letzte('spiel')!.sicht.log.filter((l) => l.wer !== undefined && l.wer !== ich && /gründet/.test(l.text));
+    expect(fremd.some((l) => /erhält \d+ Rohstoff/.test(l.text))).toBe(true);
+    expect(fremd.some((l) => /Holz|Lehm|Wolle|Getreide|Erz/.test(l.text))).toBe(false);
+  });
+});
+
 describe('Abstimmung über die Karte', () => {
   it('Stimmen stehen in der Lobby; die Mehrheit bestimmt die Karte der Partie', async () => {
     const { t, h, g } = await raum(3);
@@ -149,6 +177,22 @@ describe('Abstimmung über die Karte', () => {
     g[0].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'klassik' });
     h.host.zurLobby();
     expect(h.zustand.sitze.map((x) => x.stimme)).toEqual([null, 'spirale', 'spirale', 'spirale']);
+  });
+  it('Reiter Seefahrer: nur Seefahrer-Stimmen zählen, ohne sie gilt Neue Ufer; Schiff-Absichten kommen durch', async () => {
+    const { h, g } = await raum(3);
+    g[0].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'klassik' });
+    g[1].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: 'archipel' });
+    h.host.einstellungen({ variante: 'seefahrer' });
+    expect(g[2].letzte('lobby')!.einstellungen.variante).toBe('seefahrer');
+    h.host.starten();
+    const s = zustand(h);
+    expect(s.config.karte).toBe('archipel');
+    expect(s.config.variante).toBe('seefahrer');
+    expect(s.log.some((l) => l.text === '⛵ Seefahrer – Karte: Archipel (1 von 4 Stimmen).')).toBe(true);
+    h.host.zurLobby();
+    g[1].sende({ v: PROTOKOLL_VERSION, t: 'stimme', karte: null });
+    h.host.starten();
+    expect(zustand(h).config.karte).toBe('neueUfer');
   });
   it('ohne Stimmen wird Klassik gespielt; bei Gleichstand entscheidet das Los unter den führenden Karten', async () => {
     const ohne = await raum(2);

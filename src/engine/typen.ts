@@ -5,7 +5,26 @@ export const ROHSTOFFE = ['holz', 'lehm', 'wolle', 'getreide', 'erz'] as const;
 export type Rohstoff = (typeof ROHSTOFFE)[number];
 export type Rohstoffe = Record<Rohstoff, number>;
 
-export type Gelaende = 'wald' | 'huegel' | 'weide' | 'acker' | 'gebirge' | 'wueste';
+export type Gelaende = 'wald' | 'huegel' | 'weide' | 'acker' | 'gebirge' | 'wueste' | 'gold' | 'meer' | 'nebel';
+
+/**
+ * Nebel des Krieges: aus = alles sichtbar; mittel = Gelände und Zahlen während der ganzen Gründung verdeckt;
+ * extrem = jeder sieht ein Landfeld erst, wenn er selbst eine Siedlung oder Stadt an einer seiner Ecken hat.
+ * „nebel“ als Gelände gibt es nur in der gefilterten Sicht, nie im echten Spielzustand.
+ */
+export const NEBEL_STUFEN = ['aus', 'mittel', 'extrem'] as const;
+export type Nebel = (typeof NEBEL_STUFEN)[number];
+export const NEBEL_NAME: Record<Nebel, string> = { aus: 'Aus', mittel: 'Mittel', extrem: 'Extrem' };
+
+/** Spielvariante: Grundspiel oder Seefahrer (Schiffe, Meer, Inseln, Gold, Pirat). */
+export const VARIANTEN = ['grund', 'seefahrer'] as const;
+export type Variante = (typeof VARIANTEN)[number];
+export const VARIANTE_NAME: Record<Variante, string> = { grund: 'Grundspiel', seefahrer: 'Seefahrer' };
+
+/** Bonus für die erste Siedlung auf einer neuen Insel (Seefahrer). */
+export const INSEL_BONUS = 2;
+/** Schiffe je Spieler (Seefahrer). */
+export const SCHIFFE_JE_SPIELER = 15;
 
 export const GELAENDE_ROHSTOFF: Record<Gelaende, Rohstoff | null> = {
   wald: 'holz',
@@ -14,6 +33,9 @@ export const GELAENDE_ROHSTOFF: Record<Gelaende, Rohstoff | null> = {
   acker: 'getreide',
   gebirge: 'erz',
   wueste: null,
+  gold: null,
+  meer: null,
+  nebel: null,
 };
 
 export const ROHSTOFF_NAME: Record<Rohstoff, string> = {
@@ -46,6 +68,8 @@ export interface Hex {
   zahl: number | null;
   ecken: number[];
   nachbarn: number[];
+  /** Seefahrer: Nummer der Insel (nur Landfelder). */
+  insel?: number;
 }
 
 export interface Ecke {
@@ -78,6 +102,8 @@ export interface Brett {
   ecken: Ecke[];
   kanten: Kante[];
   haefen: Hafen[];
+  /** Seefahrer: Inseln, auf denen gegründet wird. Alle anderen bringen den Insel-Bonus. */
+  startInseln?: number[];
 }
 
 export interface Gebaeude {
@@ -100,6 +126,10 @@ export interface Spieler {
   siedlungenUebrig: number;
   staedteUebrig: number;
   strassenUebrig: number;
+  /** Seefahrer: Schiffe im Vorrat. */
+  schiffeUebrig: number;
+  /** Seefahrer: Inseln, für die der Spieler den Insel-Bonus schon bekommen hat. */
+  inselBonus: number[];
   /** Öffentliche Wunschliste: was der Spieler sucht und was er dafür bietet. */
   wunsch: { suche: Rohstoff[]; biete: Rohstoff[] };
 }
@@ -110,6 +140,7 @@ export type Phase =
   | 'abwerfen'
   | 'raeuber'
   | 'stehlen'
+  | 'gold'
   | 'aktion'
   | 'sonderbau'
   | 'ende';
@@ -117,6 +148,10 @@ export type Phase =
 export type Layout = 'anfaenger' | 'zufall';
 
 export interface SpielConfig {
+  /** Grundspiel oder Seefahrer. */
+  variante: Variante;
+  /** Nebel des Krieges. */
+  nebel: Nebel;
   /** Form der Insel(n). */
   karte: KartenId;
   /** Verteilung auf der Karte „Klassik“; die anderen Karten werden immer zufällig belegt. */
@@ -134,6 +169,8 @@ export interface SpielConfig {
 export const GLUECKSRAD_CHANCE = 0.3;
 
 export const STANDARD_CONFIG: SpielConfig = {
+  variante: 'grund',
+  nebel: 'aus',
   karte: 'klassik',
   layout: 'zufall',
   siegpunkte: 10,
@@ -162,6 +199,8 @@ export interface Bewegung {
   n: number;
   /** Beim Würfelertrag: das Feld, von dem die Karten kommen. */
   hex?: number;
+  /** Nebel: Rohstoff nur für den Empfänger sichtbar (sonst verriete er das Gelände). */
+  geheim?: boolean;
 }
 
 /** Stelle auf dem Brett, auf die sich ein Logeintrag bezieht. */
@@ -217,7 +256,19 @@ export interface GameState {
   brett: Brett;
   gebaeude: Record<number, Gebaeude>;
   strassen: Record<number, number>;
+  /** Seefahrer: Kante -> Spieler. */
+  schiffe: Record<number, number>;
   raeuber: number;
+  /** Seefahrer: Meerfeld des Piraten (null im Grundspiel). */
+  pirat: number | null;
+  /** Seefahrer: wer gerade wie viele Rohstoffe aus Goldfeldern wählen darf. */
+  gold: Record<number, number>;
+  /** Wohin es nach der Goldwahl weitergeht. */
+  nachGold: 'aktion' | 'setup';
+  /** In diesem Zug schon ein Schiff versetzt? */
+  schiffBewegt: boolean;
+  /** In diesem Zug gebaute Schiffe (dürfen nicht versetzt werden). */
+  schiffeNeu: number[];
   bank: Rohstoffe;
   stapel: EntwTyp[];
   gespielteEntw: number; // ausgespielte (abgelegte) Entwicklungskarten, für die Kartenbilanz
@@ -260,6 +311,9 @@ export type Aktion =
   | { typ: 'RAEUBER_SETZEN'; spieler: number; hex: number }
   | { typ: 'STEHLEN'; spieler: number; opfer: number }
   | { typ: 'STRASSE_BAUEN'; spieler: number; kante: number }
+  | { typ: 'SCHIFF_BAUEN'; spieler: number; kante: number }
+  | { typ: 'SCHIFF_VERSETZEN'; spieler: number; von: number; nach: number }
+  | { typ: 'GOLD_WAEHLEN'; spieler: number; rohstoffe: Partial<Rohstoffe> }
   | { typ: 'SIEDLUNG_BAUEN'; spieler: number; ecke: number }
   | { typ: 'STADT_BAUEN'; spieler: number; ecke: number }
   | { typ: 'ENTW_KAUFEN'; spieler: number }
@@ -284,6 +338,7 @@ export type Ergebnis = { ok: true; state: GameState } | { ok: false; fehler: str
 
 export const KOSTEN = {
   strasse: { holz: 1, lehm: 1 } as Partial<Rohstoffe>,
+  schiff: { holz: 1, wolle: 1 } as Partial<Rohstoffe>,
   siedlung: { holz: 1, lehm: 1, wolle: 1, getreide: 1 } as Partial<Rohstoffe>,
   stadt: { getreide: 2, erz: 3 } as Partial<Rohstoffe>,
   entwicklung: { wolle: 1, getreide: 1, erz: 1 } as Partial<Rohstoffe>,

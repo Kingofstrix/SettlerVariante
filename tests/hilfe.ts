@@ -27,7 +27,7 @@ export function fehler(s: GameState, a: Aktion): string {
 
 /** Spielt die Gründungsphase mit Standardaktionen durch. */
 export function nachSetup(s: GameState): GameState {
-  while (s.phase === 'setup') s = ok(s, { typ: 'ZEIT_ABGELAUFEN', spieler: 0 });
+  while (s.phase === 'setup' || (s.phase === 'gold' && s.nachGold === 'setup')) s = ok(s, { typ: 'ZEIT_ABGELAUFEN', spieler: 0 });
   return s;
 }
 

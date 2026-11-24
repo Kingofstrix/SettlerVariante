@@ -8,7 +8,10 @@ import {
   titel,
   ROHSTOFFE,
   ROHSTOFF_NAME,
+  beweglicheSchiffe,
   gueltigeRaeuberHexes,
+  gueltigeSchiffKanten,
+  schiffZiele,
   gueltigeSetupEcken,
   gueltigeSiedlungsEcken,
   gueltigeStadtEcken,
@@ -23,7 +26,7 @@ import { LokalSitzung } from '../netz/lokal';
 import { farbHex, type Absicht, type Sitzung, type SitzungsZustand, type TimerAnzeige } from '../netz/sitzung';
 import { DEV } from '../netz/speicher';
 import { Brett, KEINE_ZIELE, type Ziele } from './Brett';
-import { AbwerfenDialog, ErfindungDialog, HandelDialog, HilfeDialog, Modal, MonopolDialog, RohstoffListe, StehlenDialog, WunschDialog } from './Dialoge';
+import { AbwerfenDialog, ErfindungDialog, GoldDialog, HandelDialog, HilfeDialog, Modal, MonopolDialog, RohstoffListe, StehlenDialog, WunschDialog } from './Dialoge';
 import { EntwIcon, ROHSTOFF_FARBE, RohstoffIcon } from './Icons';
 import { useKartenFluege, wenigBewegung } from './animation';
 import { ChatEingabe, ChatVerlauf } from './Chat';
@@ -36,12 +39,14 @@ import { WuerfelBuehne, useWuerfelAnimation } from './WuerfelBuehne';
 import { toast, useRestzeit, useSitzung } from './hooks';
 import { setzeTon, ton, tonAn } from './ton';
 
-type Bauart = 'strasse' | 'siedlung' | 'stadt';
+type Bauart = 'strasse' | 'siedlung' | 'stadt' | 'schiff' | 'versetzen';
 
 const BAU_NAME: Record<Bauart | 'entwicklung', string> = {
   strasse: 'Straße',
   siedlung: 'Siedlung',
   stadt: 'Stadt',
+  schiff: 'Schiff',
+  versetzen: 'Schiff versetzen',
   entwicklung: 'Entwicklung',
 };
 
@@ -86,8 +91,8 @@ function useEreignisse(z: SitzungsZustand, sicht: Sicht): void {
     let fremd = false;
     for (const l of sicht.log) {
       if (l.nr <= letzteNr.current) continue;
-      if (/stiehlt|Längste Handelsstraße|Größte Rittermacht|Monopol|gewinnt/.test(l.text)) toast(l.text);
-      else if (!lokal && l.wer !== undefined && l.wer !== ich && /baut eine (Siedlung|Stadt)|kauft eine Entwicklungskarte|versetzt den Räuber/.test(l.text)) {
+      if (/stiehlt|Längste Handelsstraße|Größte Rittermacht|Monopol|gewinnt|neue Insel/.test(l.text)) toast(l.text);
+      else if (!lokal && l.wer !== undefined && l.wer !== ich && /baut eine (Siedlung|Stadt)|kauft eine Entwicklungskarte|versetzt den (Räuber|Piraten)/.test(l.text)) {
         toast(`${logSymbol(l.text)} ${l.text}`);
         fremd = true;
       }
@@ -118,6 +123,10 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
   const aktion = (a: Absicht): void => sitzung.aktion(a);
 
   const [bauart, setBauart] = useState<Bauart | null>(null);
+  /** Schiff versetzen: zuerst das Schiff wählen, dann das Ziel. */
+  const [versetzeVon, setVersetzeVon] = useState<number | null>(null);
+  /** Seefahrer, Gründung: Straße oder Schiff als zweites Teil. */
+  const [teil, setTeil] = useState<'strasse' | 'schiff'>('strasse');
   const [dialog, setDialog] = useState<null | 'handel' | 'erfindung' | 'monopol' | 'hilfe' | 'menue' | 'wunsch'>(null);
   const [fokus, setFokus] = useState<Ort | null>(null);
   useEffect(() => {
@@ -137,33 +146,56 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
   const dran = sicht.amZug.includes(ich);
   const darfBauen = (sicht.phase === 'aktion' && binAktiv) || (sicht.phase === 'sonderbau' && dran);
   const gratis = sicht.phase === 'aktion' && binAktiv && sicht.freieStrassen > 0;
+  const see = sicht.config.variante === 'seefahrer';
 
   // Bauauswahl zurücksetzen, sobald sich der Spielabschnitt ändert
-  useEffect(() => setBauart(null), [sicht.phase, sicht.aktiv, sicht.zugNr, sicht.sonderbau?.index]);
+  useEffect(() => {
+    setBauart(null);
+    setVersetzeVon(null);
+  }, [sicht.phase, sicht.aktiv, sicht.zugNr, sicht.sonderbau?.index]);
+  useEffect(() => setTeil('strasse'), [sicht.setup.schritt]);
 
   const plaetze = useMemo(
     () => ({
       strasse: gueltigeStrassenKanten(sicht, ich),
       siedlung: gueltigeSiedlungsEcken(sicht, ich, false),
       stadt: gueltigeStadtEcken(sicht, ich),
+      schiff: gueltigeSchiffKanten(sicht, ich),
     }),
-    [sicht.gebaeude, sicht.strassen, ich],
+    [sicht.gebaeude, sicht.strassen, sicht.schiffe, sicht.pirat, ich],
+  );
+  // Schiffe, die sich versetzen lassen (und mindestens ein Ziel haben)
+  const beweglich = useMemo(
+    () =>
+      see && sicht.phase === 'aktion' && binAktiv && !sicht.schiffBewegt
+        ? beweglicheSchiffe(sicht, ich, sicht.schiffeNeu).filter((k) => schiffZiele(sicht, ich, k).length > 0)
+        : [],
+    [sicht.schiffe, sicht.gebaeude, sicht.pirat, sicht.phase, sicht.schiffBewegt, sicht.schiffeNeu, binAktiv, ich],
   );
 
   const ziele: Ziele = useMemo(() => {
     if (z.pausiert || !dran) return KEINE_ZIELE;
-    if (sicht.phase === 'setup')
-      return sicht.setup.erwartet === 'siedlung'
-        ? { art: 'siedlung', ecken: gueltigeSetupEcken(sicht), kanten: [], hexes: [] }
-        : { art: 'strasse', ecken: [], kanten: gueltigeStrassenKanten(sicht, ich, sicht.setup.letzteEcke), hexes: [] };
+    if (sicht.phase === 'setup') {
+      if (sicht.setup.erwartet === 'siedlung') return { art: 'siedlung', ecken: gueltigeSetupEcken(sicht), kanten: [], hexes: [] };
+      const strassen = gueltigeStrassenKanten(sicht, ich, sicht.setup.letzteEcke);
+      const schiffe = see ? gueltigeSchiffKanten(sicht, ich, sicht.setup.letzteEcke) : [];
+      return (teil === 'schiff' && schiffe.length) || !strassen.length
+        ? { art: 'schiff', ecken: [], kanten: schiffe, hexes: [] }
+        : { art: 'strasse', ecken: [], kanten: strassen, hexes: [] };
+    }
     if (sicht.phase === 'raeuber') return { art: 'raeuber', ecken: [], kanten: [], hexes: gueltigeRaeuberHexes(sicht, ich) };
     if (!darfBauen) return KEINE_ZIELE;
-    const art = gratis ? 'strasse' : bauart;
+    const art = gratis ? (bauart === 'schiff' || (plaetze.strasse.length === 0 && see) ? 'schiff' : 'strasse') : bauart;
     if (art === 'strasse') return { art, ecken: [], kanten: plaetze.strasse, hexes: [] };
+    if (art === 'schiff') return { art, ecken: [], kanten: plaetze.schiff, hexes: [] };
     if (art === 'siedlung') return { art, ecken: plaetze.siedlung, kanten: [], hexes: [] };
     if (art === 'stadt') return { art, ecken: plaetze.stadt, kanten: [], hexes: [] };
+    if (art === 'versetzen')
+      return versetzeVon === null
+        ? { art: 'versetzen', ecken: [], kanten: beweglich, hexes: [] }
+        : { art: 'ziel', ecken: [], kanten: schiffZiele(sicht, ich, versetzeVon), hexes: [] };
     return KEINE_ZIELE;
-  }, [sicht, bauart, z.pausiert]);
+  }, [sicht, bauart, z.pausiert, teil, versetzeVon, beweglich]);
 
   const bauGrund = (art: Bauart | 'entwicklung'): string | null => {
     if (z.pausiert) return 'Das Spiel ist pausiert.';
@@ -171,16 +203,28 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
       if (!dran) return 'Du bist nicht dran.';
       return sicht.phase === 'wuerfeln' ? 'Erst würfeln.' : 'Gerade nicht möglich.';
     }
-    if (gratis) return art === 'strasse' ? null : 'Baue zuerst deine kostenlosen Straßen.';
+    if (gratis) {
+      if (art === 'strasse') return plaetze.strasse.length ? null : 'Kein gültiger Bauplatz.';
+      if (art === 'schiff') return plaetze.schiff.length ? null : 'Kein gültiger Platz für ein Schiff.';
+      return 'Baue zuerst deine kostenlosen Straßen.';
+    }
+    if (art === 'versetzen') {
+      if (sicht.phase !== 'aktion') return 'Schiffe versetzt man nur im eigenen Zug.';
+      if (sicht.schiffBewegt) return 'Du hast in diesem Zug schon ein Schiff versetzt.';
+      return beweglich.length ? null : 'Kein Schiff lässt sich gerade versetzen (offenes Ende, nicht neu, nicht beim Piraten).';
+    }
     if (art === 'entwicklung') {
       if (sicht.stapelAnzahl === 0) return 'Keine Entwicklungskarten mehr im Stapel.';
       return fehlend(hand, KOSTEN.entwicklung);
     }
-    const vorrat = art === 'strasse' ? mein.strassenUebrig : art === 'siedlung' ? mein.siedlungenUebrig : mein.staedteUebrig;
-    if (vorrat <= 0) return `Keine ${art === 'strasse' ? 'Straßen' : art === 'siedlung' ? 'Siedlungen' : 'Städte'} mehr im Vorrat.`;
+    const vorrat =
+      art === 'strasse' ? mein.strassenUebrig : art === 'siedlung' ? mein.siedlungenUebrig : art === 'schiff' ? mein.schiffeUebrig : mein.staedteUebrig;
+    if (vorrat <= 0)
+      return `Keine ${art === 'strasse' ? 'Straßen' : art === 'siedlung' ? 'Siedlungen' : art === 'schiff' ? 'Schiffe' : 'Städte'} mehr im Vorrat.`;
     const f = fehlend(hand, KOSTEN[art]);
     if (f) return f;
-    if (plaetze[art].length === 0) return art === 'stadt' ? 'Du hast keine Siedlung zum Ausbauen.' : 'Kein gültiger Bauplatz.';
+    if (plaetze[art].length === 0)
+      return art === 'stadt' ? 'Du hast keine Siedlung zum Ausbauen.' : art === 'schiff' ? 'Kein gültiger Platz für ein Schiff.' : 'Kein gültiger Bauplatz.';
     return null;
   };
 
@@ -193,7 +237,7 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
     if (gratis) return 'Baue zuerst deine kostenlosen Straßen.';
     if (sicht.entwGespielt) return 'Du hast in diesem Zug schon eine Karte gespielt.';
     if (!mein.entw!.some((k) => k.typ === typ && k.gekauftInZug < sicht.zugNr)) return 'In diesem Zug gekauft – erst nächste Runde spielbar.';
-    if (typ === 'strassenbau' && (mein.strassenUebrig <= 0 || plaetze.strasse.length === 0)) return 'Du kannst gerade keine Straße bauen.';
+    if (typ === 'strassenbau' && plaetze.strasse.length === 0 && plaetze.schiff.length === 0) return 'Du kannst gerade keine Straße bauen.';
     return null;
   };
 
@@ -224,9 +268,28 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
         <div class={`statuszeile ${status.ich ? 'ich' : ''}`}>
           {status.text}
           {bauart && darfBauen && !gratis && (
-            <button class="knopf klein" onClick={() => setBauart(null)}>
+            <button
+              class="knopf klein"
+              onClick={() => {
+                setBauart(null);
+                setVersetzeVon(null);
+              }}
+            >
               {BAU_NAME[bauart]} abbrechen
             </button>
+          )}
+          {bauart === 'versetzen' && darfBauen && (
+            <span class="status-zusatz">{versetzeVon === null ? 'Wähle das Schiff' : 'Wähle den neuen Platz'}</span>
+          )}
+          {see && sicht.phase === 'setup' && sicht.setup.erwartet === 'strasse' && dran && (
+            <span class="segment">
+              <button class={`chip ${ziele.art === 'strasse' ? 'an' : ''}`} onClick={() => setTeil('strasse')}>
+                🛤️ Straße
+              </button>
+              <button class={`chip ${ziele.art === 'schiff' ? 'an' : ''}`} onClick={() => setTeil('schiff')}>
+                ⛵ Schiff
+              </button>
+            </span>
           )}
         </div>
         <Brett
@@ -241,8 +304,14 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
             setBauart(null);
           }}
           onKante={(kante) => {
+            if (ziele.art === 'versetzen') return setVersetzeVon(kante);
             ton('bau');
-            aktion({ typ: 'STRASSE_BAUEN', kante });
+            if (ziele.art === 'ziel' && versetzeVon !== null) {
+              aktion({ typ: 'SCHIFF_VERSETZEN', von: versetzeVon, nach: kante });
+              setVersetzeVon(null);
+              setBauart(null);
+            } else if (ziele.art === 'schiff') aktion({ typ: 'SCHIFF_BAUEN', kante });
+            else aktion({ typ: 'STRASSE_BAUEN', kante });
           }}
           onHex={(hex) => aktion({ typ: 'RAEUBER_SETZEN', hex })}
         />
@@ -317,18 +386,25 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
             )}
           </div>
           <div class="baumenue">
-            {(['strasse', 'siedlung', 'stadt', 'entwicklung'] as const).map((art) => {
+            {(see
+              ? (['strasse', 'schiff', 'siedlung', 'stadt', 'entwicklung', 'versetzen'] as const)
+              : (['strasse', 'siedlung', 'stadt', 'entwicklung'] as const)
+            ).map((art) => {
               const grund = bauGrund(art);
-              const gewaehlt = art !== 'entwicklung' && (bauart === art || (gratis && art === 'strasse'));
+              const gewaehlt = art !== 'entwicklung' && ziele.art !== null && (ziele.art === art || (art === 'versetzen' && ziele.art === 'ziel'));
               return (
                 <span class="tip-halter" data-tip={grund ?? undefined}>
                   <button
                     class={`knopf bau ${gewaehlt ? 'gewaehlt' : ''}`}
                     disabled={!!grund}
-                    onClick={() => (art === 'entwicklung' ? aktion({ typ: 'ENTW_KAUFEN' }) : setBauart(bauart === art ? null : art))}
+                    onClick={() => {
+                      if (art === 'entwicklung') return aktion({ typ: 'ENTW_KAUFEN' });
+                      setVersetzeVon(null);
+                      setBauart(bauart === art && !gratis ? null : art);
+                    }}
                   >
-                    <b>{BAU_NAME[art]}</b>
-                    <RohstoffListe r={KOSTEN[art]} />
+                    <b>{art === 'schiff' ? '⛵ ' : ''}{BAU_NAME[art]}</b>
+                    {art === 'versetzen' ? <small class="bau-hinweis">1× pro Zug</small> : <RohstoffListe r={KOSTEN[art]} />}
                   </button>
                 </span>
               );
@@ -410,11 +486,14 @@ export function SpielAnsicht({ sitzung, onVerlassen }: { sitzung: Sitzung; onVer
         />
       )}
       {rad.anzeige && <GluecksradBuehne key={rad.anzeige.id} anzeige={rad.anzeige} onFertig={rad.fertig} eilig={rad.wartend > 0} />}
+      {sicht.phase === 'gold' && sicht.gold[ich] !== undefined && (
+        <GoldMitRestzeit key={`${ich}:${sicht.zugNr}:${sicht.setup.schritt}`} sicht={sicht} aktion={aktion} timer={z.timer} />
+      )}
       {sicht.phase === 'stehlen' && binAktiv && <StehlenDialog sicht={sicht} aktion={aktion} />}
       {dialog === 'handel' && sicht.phase === 'aktion' && <HandelDialog sicht={sicht} vorlage={gegen} aktion={aktion} onZu={() => setDialog(null)} />}
       {dialog === 'erfindung' && <ErfindungDialog sicht={sicht} aktion={aktion} onZu={() => setDialog(null)} />}
       {dialog === 'monopol' && <MonopolDialog aktion={aktion} onZu={() => setDialog(null)} />}
-      {dialog === 'hilfe' && <HilfeDialog onZu={() => setDialog(null)} />}
+      {dialog === 'hilfe' && <HilfeDialog variante={sicht.config.variante} onZu={() => setDialog(null)} />}
       {dialog === 'wunsch' && sicht.phase !== 'ende' && <WunschDialog sicht={sicht} aktion={aktion} onZu={() => setDialog(null)} />}
       {dialog === 'menue' && (
         <Menue sitzung={sitzung} z={z} onZu={() => setDialog(null)} onVerlassen={onVerlassen} />
@@ -438,6 +517,11 @@ function AbwerfenMitRestzeit({
 }): JSX.Element {
   const rest = useRestzeit(timer?.art === 'abwerfen' ? timer : null);
   return <AbwerfenDialog sicht={sicht} aktion={aktion} rest={rest} onDrehen={onDrehen} />;
+}
+
+function GoldMitRestzeit({ sicht, aktion, timer }: { sicht: Sicht; aktion: (a: Absicht) => void; timer: TimerAnzeige | null }): JSX.Element {
+  const rest = useRestzeit(timer?.art === 'abwerfen' ? timer : null);
+  return <GoldDialog sicht={sicht} aktion={aktion} rest={rest} />;
 }
 
 /** Kurzes Konfetti zum Sieg (aus bei "Bewegung reduzieren"). */

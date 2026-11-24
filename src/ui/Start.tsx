@@ -1,18 +1,19 @@
 // Startbildschirm: Raum erstellen, beitreten, als Beamer verbinden, lokal spielen.
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
-import { KARTEN, KARTEN_NAME, type KartenId } from '../engine';
+import { KARTEN_NAME, NEBEL_NAME, NEBEL_STUFEN, kartenFuer, standardKarte, type KartenId, type Nebel, type Variante } from '../engine';
 import { FARBEN } from '../netz/sitzung';
 import { DEV, codeGueltig, lese, normalisiereCode, schreibe, type Profil } from '../netz/speicher';
 import type { NetzOverride } from '../netz/transport';
 import { HilfeDialog } from './Dialoge';
+import { VariantenReiter } from './Kartenwahl';
 import { Rangliste } from './Rangliste';
 
 export interface StartAktionen {
   erstellen(profil: Profil): void;
   beitreten(code: string, rolle: 'spieler' | 'beamer', profil: Profil): void;
   importieren(json: string): void;
-  lokal(anzahl: number, karte: KartenId): void;
+  lokal(anzahl: number, karte: KartenId, variante: Variante, nebel: Nebel): void;
 }
 
 export function Start({ aktionen, fehler, laedt }: { aktionen: StartAktionen; fehler: string | null; laedt: string | null }): JSX.Element {
@@ -23,7 +24,9 @@ export function Start({ aktionen, fehler, laedt }: { aktionen: StartAktionen; fe
   const [hilfe, setHilfe] = useState(false);
   const [netz, setNetz] = useState<NetzOverride>(lese<NetzOverride>('netz') ?? {});
   const [lokalAnzahl, setLokalAnzahl] = useState(4);
+  const [lokalVariante, setLokalVariante] = useState<Variante>('grund');
   const [lokalKarte, setLokalKarte] = useState<KartenId>('klassik');
+  const [lokalNebel, setLokalNebel] = useState<Nebel>('aus');
   const profil = (): Profil => {
     const p = { name: name.trim() || 'Spieler', farbe };
     schreibe('profil', p);
@@ -111,14 +114,31 @@ export function Start({ aktionen, fehler, laedt }: { aktionen: StartAktionen; fe
               </button>
             ))}
           </div>
+          <VariantenReiter
+            variante={lokalVariante}
+            onWahl={(v) => {
+              setLokalVariante(v);
+              setLokalKarte(standardKarte(v));
+            }}
+          />
           <div class="feld">
             <label>Karte</label>
-            {KARTEN.map((k) => (
+            {kartenFuer(lokalVariante).map((k) => (
               <button class={`chip ${lokalKarte === k ? 'an' : ''}`} onClick={() => setLokalKarte(k)}>
                 {KARTEN_NAME[k]}
               </button>
             ))}
-            <button class="knopf" onClick={() => aktionen.lokal(lokalAnzahl, lokalKarte)}>
+          </div>
+          <div class="feld">
+            <label data-tip="Mittel: Gründung verdeckt. Extrem: Felder erst sichtbar mit eigener Siedlung daran (Sicht wechselt mit dem Spieler).">
+              🌫️ Nebel
+            </label>
+            {NEBEL_STUFEN.map((n) => (
+              <button class={`chip ${lokalNebel === n ? 'an' : ''}`} onClick={() => setLokalNebel(n)}>
+                {NEBEL_NAME[n]}
+              </button>
+            ))}
+            <button class="knopf" onClick={() => aktionen.lokal(lokalAnzahl, lokalKarte, lokalVariante, lokalNebel)}>
               Lokales Spiel starten
             </button>
           </div>
