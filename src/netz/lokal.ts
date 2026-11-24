@@ -17,6 +17,8 @@ export class LokalSitzung extends Beobachtbar implements Sitzung {
       seed: zufallsSeed(),
       config: {
         karte,
+        variante: einstellungen.variante,
+        nebel: einstellungen.nebel,
         layout: einstellungen.layout,
         siegpunkte: einstellungen.siegpunkte,
         freundlicherRaeuber: einstellungen.freundlicherRaeuber,

@@ -5,13 +5,14 @@
 // Wiederkehrende Formen stehen einmal in <defs> und werden per <use> eingesetzt. Keine SVG-Filter.
 import type { JSX } from 'preact';
 import { useMemo, useRef } from 'preact/hooks';
-import { punkte, type Brett as BrettDaten, type Ort, type Sicht } from '../engine';
+import { istLand, punkte, type Brett as BrettDaten, type Ort, type Sicht } from '../engine';
 import { farbHex } from '../netz/sitzung';
 import { GelaendeDefs } from './Gelaende';
 import { rohstoffForm } from './Icons';
 
 export interface Ziele {
-  art: 'strasse' | 'siedlung' | 'stadt' | 'raeuber' | null;
+  /** schiff: Schiff bauen; versetzen: zu versetzendes Schiff wählen; ziel: neuer Platz des Schiffs */
+  art: 'strasse' | 'siedlung' | 'stadt' | 'raeuber' | 'schiff' | 'versetzen' | 'ziel' | null;
   ecken: number[];
   kanten: number[];
   hexes: number[];
@@ -78,12 +79,15 @@ function viewBox(b: BrettDaten): string {
 /** Alles, was sich während einer Partie nicht ändert. */
 function Grundebene({ b, box }: { b: BrettDaten; box: string }): JSX.Element {
   const ecke = (id: number): string => `${b.ecken[id].x * S},${b.ecken[id].y * S}`;
+  // Seefahrer: Meerfelder sind Teil des Bretts, gezeichnet wird aber nur das Land.
+  const land = b.hexes.filter(istLand);
+  const meer = b.hexes.filter((h) => !istLand(h));
   return (
     <svg class="brett brett-grund" viewBox={box} aria-hidden="true">
       <defs>
         <polygon id="b-hex" points={HEX_PUNKTE} />
         <g id="b-insel">
-          {b.hexes.map((h) => (
+          {land.map((h) => (
             <polygon points={h.ecken.map(ecke).join(' ')} />
           ))}
         </g>
@@ -93,6 +97,11 @@ function Grundebene({ b, box }: { b: BrettDaten; box: string }): JSX.Element {
         </linearGradient>
         <GelaendeDefs />
       </defs>
+
+      {/* Seefahrer: zarte Umrisse der Meerfelder, damit man die Fahrwege sieht */}
+      {meer.map((h) => (
+        <polygon points={h.ecken.map(ecke).join(' ')} class="meerfeld" />
+      ))}
 
       {/* Flachwasser, Schatten, Sockel, Strand: fünfmal dieselbe Inselform */}
       <use href="#b-insel" class="insel saum weit" />
@@ -130,7 +139,7 @@ function Grundebene({ b, box }: { b: BrettDaten; box: string }): JSX.Element {
       })}
 
       {/* Felder: Unterkante, Oberseite mit Verlauf, Geländebild, Zahlenchip */}
-      {b.hexes.map((h) => {
+      {land.map((h) => {
         const rot = h.zahl === 6 || h.zahl === 8;
         const p = punkte(h.zahl);
         return (
@@ -174,6 +183,11 @@ export function Brett({ sicht, ziele = KEINE_ZIELE, meineFarbe, onEcke, onKante,
     const ecke = (id: number): [number, number] => [b.ecken[id].x * S, b.ecken[id].y * S];
     const farbe = (sp: number): string => farbHex(sicht.spieler[sp].farbe);
     const raeuber = b.hexes[sicht.raeuber];
+    const pirat = sicht.pirat !== null && sicht.pirat !== undefined ? b.hexes[sicht.pirat] : null;
+    const mitte = (kid: number): [number, number] => {
+      const k = b.kanten[kid];
+      return [((b.ecken[k.a].x + b.ecken[k.b].x) / 2) * S, ((b.ecken[k.a].y + b.ecken[k.b].y) / 2) * S];
+    };
     return (
       <svg class="brett brett-spiel" viewBox={box} style={{ '--ich': meineFarbe ?? '#fff' }} role="img" aria-label="Spielbrett">
         <defs>
@@ -200,6 +214,13 @@ export function Brett({ sicht, ziele = KEINE_ZIELE, meineFarbe, onEcke, onKante,
             <path d="M-23.5,-5.5h6v21h-6Z" class="fig-hell" />
             <path d="M-11,18v-9a3.5,3.5 0 0 1 7,0v9ZM6,8h5.5v6H6ZM15,8h5.5v6H15Z" class="fig-tuer" />
             <path d={hausPfad(0, 0, true, 1)} class="fig-umriss" />
+          </g>
+          <g id="b-schiff" transform="scale(1.3)">
+            <ellipse cx="2" cy="15" rx="26" ry="6" class="schiff-schatten" />
+            <path d="M-25,2H25L17,14H-17Z" class="schiff-rumpf" />
+            <path d="M-2,0V-30L-20,-2Z" class="schiff-segel" />
+            <path d="M2,-1V-26L18,-1Z" class="schiff-segel" />
+            <path d="M-2,-30l11,4-11,4Z" class="schiff-wimpel" />
           </g>
           <linearGradient id="v-raeuber" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stop-color="#4a4556" />
@@ -241,14 +262,27 @@ export function Brett({ sicht, ziele = KEINE_ZIELE, meineFarbe, onEcke, onKante,
           );
         })}
 
-        {/* Straßen-Ziele */}
+        {/* Schiffe (Seefahrer) */}
+        {Object.entries(sicht.schiffe ?? {}).map(([kid, sp]) => {
+          const [x, y] = mitte(Number(kid));
+          const neu = markiert?.kanten.has(Number(kid));
+          return (
+            <g key={`s${kid}`}>
+              {neu && <circle class="markierung" cx={x} cy={y} r="34" style={{ stroke: farbe(sp) }} />}
+              <use class="schiff" href="#b-schiff" x={x} y={y} style={{ color: farbe(sp) }} />
+            </g>
+          );
+        })}
+
+        {/* Straßen- und Schiffsziele */}
         {ziele.kanten.map((kid) => {
           const k = b.kanten[kid];
           const [ax, ay] = ecke(k.a);
           const [bx, by] = ecke(k.b);
           const [x1, y1, x2, y2] = [ax + (bx - ax) * 0.2, ay + (by - ay) * 0.2, bx - (bx - ax) * 0.2, by - (by - ay) * 0.2];
+          const see = ziele.art === 'schiff' || ziele.art === 'ziel' || ziele.art === 'versetzen';
           return (
-            <g class="ziel ziel-kante" onClick={() => klick.current.onKante?.(kid)}>
+            <g class={`ziel ziel-kante ${see ? 'see' : ''} ${ziele.art === 'versetzen' ? 'waehlbar' : ''}`} onClick={() => klick.current.onKante?.(kid)}>
               <line x1={x1} y1={y1} x2={x2} y2={y2} class="kante-grund" />
               <line x1={x1} y1={y1} x2={x2} y2={y2} class="kante-strich" />
             </g>
@@ -291,6 +325,15 @@ export function Brett({ sicht, ziele = KEINE_ZIELE, meineFarbe, onEcke, onKante,
             </g>
           );
         })}
+
+        {/* Pirat (Seefahrer) */}
+        {pirat && (
+          <g class="pirat" transform={`translate(${pirat.x * S},${pirat.y * S + 6}) scale(1.5)`}>
+            <use href="#b-schiff" />
+            <path d="M-2,-30h14v9h-14Z" class="schiff-rumpf" />
+            <circle cx="5" cy="-26.5" r="2.6" class="pirat-flagge" />
+          </g>
+        )}
 
         {/* Räuber */}
         <g class="raeuber" transform={`translate(${raeuber.x * S - 47},${raeuber.y * S + 22})`}>

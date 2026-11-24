@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   KARTEN,
+  kartenFuer,
   baueGraph,
   erzeugeBrett,
   feldKoordinaten,
@@ -19,7 +20,7 @@ import {
 } from '../src/engine';
 import { FARBEN } from './hilfe';
 
-const NEUE = KARTEN.filter((k) => k !== 'klassik');
+const NEUE = kartenFuer('grund').filter((k) => k !== 'klassik') as Exclude<KartenId, 'klassik' | 'neueUfer' | 'archipel'>[];
 const ROHSTOFF_GELAENDE: Gelaende[] = ['wald', 'weide', 'acker', 'huegel', 'gebirge'];
 
 /** Wasserfelder im Rahmen um die Karte, die vom offenen Meer aus nicht erreichbar sind. */
@@ -57,7 +58,7 @@ function pruefeGraph(b: Brett): void {
 }
 
 describe('Kartenformen', () => {
-  const erwartet: Record<Exclude<KartenId, 'klassik'>, { klein: number; gross: number; inseln: number }> = {
+  const erwartet: Record<(typeof NEUE)[number], { klein: number; gross: number; inseln: number }> = {
     zwillinge: { klein: 26, gross: 52, inseln: 2 },
     spirale: { klein: 33, gross: 54, inseln: 1 },
     fjorde: { klein: 25, gross: 53, inseln: 1 },
@@ -159,7 +160,7 @@ describe('Belegung freier Karten', () => {
 describe('Abstimmung', () => {
   it('zählt Stimmen; ohne Stimmen gilt Klassik', () => {
     expect(zaehleStimmen([null, null, undefined])).toEqual({
-      stimmen: { klassik: 0, zwillinge: 0, spirale: 0, fjorde: 0 },
+      stimmen: { klassik: 0, zwillinge: 0, spirale: 0, fjorde: 0, neueUfer: 0, archipel: 0 },
       abgegeben: 0,
       vorn: ['klassik'],
     });

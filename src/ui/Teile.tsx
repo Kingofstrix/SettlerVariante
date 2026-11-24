@@ -1,7 +1,7 @@
 // Bausteine, die Spieler- und Beameransicht gemeinsam nutzen.
 import type { JSX } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
-import { ROHSTOFFE, ROHSTOFF_NAME, kartenProRohstoff, type Handelsangebot, type Ort, type Rohstoffe, type Sicht, type SichtLog } from '../engine';
+import { INSEL_BONUS, ROHSTOFFE, ROHSTOFF_NAME, kartenProRohstoff, type Handelsangebot, type Ort, type Rohstoffe, type Sicht, type SichtLog } from '../engine';
 import { farbHex, type Absicht, type TimerAnzeige } from '../netz/sitzung';
 import { RohstoffListe } from './Dialoge';
 import { useRestzeit } from './hooks';
@@ -18,7 +18,7 @@ export function statusText(sicht: Sicht): { text: string; ich: boolean } {
       return { text: `${name(sicht.gewinner!)} hat gewonnen!`, ich: false };
     case 'setup': {
       const sp = sicht.amZug[0];
-      const was = sicht.setup.erwartet === 'siedlung' ? 'Siedlung' : 'Straße';
+      const was = sicht.setup.erwartet === 'siedlung' ? 'Siedlung' : sicht.config.variante === 'seefahrer' ? 'Straße oder ein Schiff' : 'Straße';
       return { text: `Gründung – ${wer(sp, `setzt eine ${was}`, `${was} setzen`)}`, ich };
     }
     case 'wuerfeln':
@@ -28,13 +28,22 @@ export function statusText(sicht: Sicht): { text: string; ich: boolean } {
         text: ich ? 'Eine 7: Du musst Karten abwerfen' : `Eine 7 – es werfen ab: ${sicht.amZug.map(name).join(', ')}`,
         ich,
       };
+    case 'gold':
+      return {
+        text: ich ? '✨ Gold! Wähle deine Rohstoffe' : `✨ Gold – es wählen: ${sicht.amZug.map(name).join(', ')}`,
+        ich,
+      };
     case 'raeuber':
-      return { text: wer(sicht.aktiv, 'versetzt den Räuber', 'Räuber versetzen'), ich };
+      return sicht.config.variante === 'seefahrer'
+        ? { text: wer(sicht.aktiv, 'versetzt Räuber oder Pirat', 'Räuber (Land) oder Pirat (Meer) versetzen'), ich }
+        : { text: wer(sicht.aktiv, 'versetzt den Räuber', 'Räuber versetzen'), ich };
     case 'stehlen':
       return { text: wer(sicht.aktiv, 'wählt, wen er bestiehlt', 'jemanden bestehlen'), ich };
     case 'aktion':
       return sicht.freieStrassen > 0
-        ? { text: wer(sicht.aktiv, 'baut kostenlose Straßen', `${sicht.freieStrassen} kostenlose Straße(n) bauen`), ich }
+        ? sicht.config.variante === 'seefahrer'
+          ? { text: wer(sicht.aktiv, 'baut kostenlos', `${sicht.freieStrassen} kostenlose Straße(n) oder Schiff(e) bauen`), ich }
+          : { text: wer(sicht.aktiv, 'baut kostenlose Straßen', `${sicht.freieStrassen} kostenlose Straße(n) bauen`), ich }
         : { text: wer(sicht.aktiv, 'handelt und baut', 'handeln und bauen'), ich };
     case 'sonderbau': {
       const sp = sicht.amZug[0];
@@ -77,6 +86,11 @@ export function SpielerTafel({ sicht, verbunden }: { sicht: Sicht; verbunden: bo
                   <EntwIcon typ="strassenbau" groesse={13} /> +2
                 </span>
               )}
+              {p.inselBonus?.length > 0 && (
+                <span class="marke" data-tip={`Neue Inseln besiedelt (je +${INSEL_BONUS})`}>
+                  🏝️ +{p.inselBonus.length * INSEL_BONUS}
+                </span>
+              )}
               {sicht.groessteMacht === p.id && (
                 <span class="marke" data-tip="Größte Rittermacht (+2)">
                   <EntwIcon typ="ritter" groesse={13} /> +2
@@ -93,9 +107,10 @@ export function SpielerTafel({ sicht, verbunden }: { sicht: Sicht; verbunden: bo
               <span data-tip="Gespielte Ritter">
                 <EntwIcon typ="ritter" groesse={14} /> {p.gespielteRitter}
               </span>
-              <span data-tip="Längste eigene Straße">
+              <span data-tip={sicht.config.variante === 'seefahrer' ? 'Längste Handelsroute (Straßen und Schiffe)' : 'Längste eigene Straße'}>
                 <EntwIcon typ="strassenbau" groesse={14} /> {p.strassenLaenge}
               </span>
+              {sicht.config.variante === 'seefahrer' && <span data-tip="Schiffe im Vorrat">⛵ {p.schiffeUebrig}</span>}
             </div>
             <div class="spunkte" data-tip={p.id === sicht.ich ? 'Deine Siegpunkte (inkl. verdeckter Karten)' : 'Sichtbare Siegpunkte'}>
               {punkte}

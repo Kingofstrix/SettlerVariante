@@ -1,5 +1,5 @@
 // Gemeinsame Schnittstelle, gegen die die Oberfläche arbeitet – egal ob Host, Client, Beamer oder lokales Spiel.
-import type { Aktion, KartenId, Layout, Sicht } from '../engine';
+import type { Aktion, KartenId, Layout, Nebel, Sicht, Variante } from '../engine';
 
 type OhneSpieler<T> = T extends unknown ? Omit<T, 'spieler'> : never;
 /** Absicht eines Spielers: eine Aktion ohne Spielerindex (den setzt der Host). */
@@ -20,6 +20,10 @@ export interface SitzInfo {
 }
 
 export interface Einstellungen {
+  /** Grundspiel oder Seefahrer (Reiter über der Kartenwahl). */
+  variante: Variante;
+  /** Nebel des Krieges: aus, mittel (Gründung verdeckt), extrem (nur an eigenen Siedlungen sichtbar) */
+  nebel: Nebel;
   maxSpieler: number; // 3–6
   layout: Layout;
   siegpunkte: number; // 8, 10, 12
@@ -34,6 +38,8 @@ export interface Einstellungen {
 }
 
 export const STANDARD_EINSTELLUNGEN: Einstellungen = {
+  variante: 'grund',
+  nebel: 'aus',
   maxSpieler: 6,
   layout: 'zufall',
   siegpunkte: 10,

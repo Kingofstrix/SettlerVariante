@@ -1,5 +1,5 @@
 // Brettgeometrie (Axialkoordinaten, spitze Hexfelder) und Brettgenerierung.
-import { kartenFelder, type KartenId } from './karten';
+import { istSeeKarte, kartenFelder, seeFelder, type KartenId, type SeeKarte } from './karten';
 import type { Brett, Ecke, Gelaende, Hafen, HafenTyp, Hex, Kante, Layout } from './typen';
 import { mischen, zufall, type RngTraeger } from './rng';
 
@@ -102,10 +102,23 @@ export function baueGraph(gross: boolean, koord: [number, number][] = hexKoordin
   return { gross, hexes, ecken, kanten, haefen: [] };
 }
 
-/** Küstenkanten (gehören zu genau einem Hex), im Uhrzeigersinn um die Brettmitte sortiert. */
+/** Wahr für Land (auch Gold), falsch für Meer. */
+export function istLand(h: Hex): boolean {
+  return h.gelaende !== 'meer';
+}
+
+/** Felder an einer Kante (eins an der Küste ohne Meerfelder, sonst zwei). */
+export function kantenFelder(brett: Brett, kante: number): number[] {
+  const k = brett.kanten[kante];
+  const b = brett.ecken[k.b].hexes;
+  return brett.ecken[k.a].hexes.filter((h) => b.includes(h));
+}
+
+/** Küstenkanten (gehören zu genau einem Landfeld), im Uhrzeigersinn um die Brettmitte sortiert. */
 export function kuestenKanten(brett: Brett): { kante: number; hex: number }[] {
   const zaehler = new Map<number, number[]>();
-  for (const h of brett.hexes) {
+  const land = brett.hexes.filter(istLand);
+  for (const h of land) {
     for (let i = 0; i < 6; i++) {
       const a = h.ecken[i];
       const b = h.ecken[(i + 1) % 6];
@@ -115,8 +128,8 @@ export function kuestenKanten(brett: Brett): { kante: number; hex: number }[] {
       zaehler.set(k.id, l);
     }
   }
-  const cx = brett.hexes.reduce((s, h) => s + h.x, 0) / brett.hexes.length;
-  const cy = brett.hexes.reduce((s, h) => s + h.y, 0) / brett.hexes.length;
+  const cx = land.reduce((s, h) => s + h.x, 0) / land.length;
+  const cy = land.reduce((s, h) => s + h.y, 0) / land.length;
   const kueste: { kante: number; hex: number; w: number }[] = [];
   for (const [kante, hs] of zaehler) {
     if (hs.length !== 1) continue;
@@ -182,10 +195,10 @@ export function feldKoordinaten(karte: KartenId, gross: boolean): [number, numbe
   return karte === 'klassik' ? hexKoordinaten(gross) : kartenFelder(karte, gross);
 }
 
-/** Gelände für n Felder im Verhältnis des Grundspiels (4:4:4:3:3), dazu 1–3 Wüsten. */
-export function gelaendeFuer(n: number): Gelaende[] {
+/** Gelände für n Felder im Verhältnis des Grundspiels (4:4:4:3:3), dazu 1–2 Wüsten (oder die angegebene Zahl). */
+export function gelaendeFuer(n: number, wuestenZahl?: number): Gelaende[] {
   // Höchstens zwei Wüsten: Auf den Zwillingsinseln bekommt jede Insel höchstens eine.
-  const wuesten = n < 28 ? 1 : 2;
+  const wuesten = wuestenZahl ?? (n < 28 ? 1 : 2);
   const p = n - wuesten;
   const arten: [Gelaende, number][] = [['wald', 4], ['weide', 4], ['acker', 4], ['huegel', 3], ['gebirge', 3]];
   const genau = arten.map(([, anteil]) => (p * anteil) / 18);
@@ -204,12 +217,12 @@ export function zahlenFuer(n: number): number[] {
   return [...l, ...zusatz.slice(0, n % 18)];
 }
 
-/** Zusammenhängende Landmassen als Listen von Feld-IDs. */
+/** Zusammenhängende Landmassen als Listen von Feld-IDs (Meer zählt nicht). */
 export function inseln(brett: Brett): number[][] {
   const gesehen = new Set<number>();
   const liste: number[][] = [];
   for (const h of brett.hexes) {
-    if (gesehen.has(h.id)) continue;
+    if (gesehen.has(h.id) || !istLand(h)) continue;
     const insel: number[] = [];
     const offen = [h.id];
     gesehen.add(h.id);
@@ -217,7 +230,7 @@ export function inseln(brett: Brett): number[][] {
       const id = offen.pop()!;
       insel.push(id);
       for (const n of brett.hexes[id].nachbarn) {
-        if (gesehen.has(n)) continue;
+        if (gesehen.has(n) || !istLand(brett.hexes[n])) continue;
         gesehen.add(n);
         offen.push(n);
       }
@@ -262,8 +275,8 @@ function belegeFrei(brett: Brett, rng: RngTraeger): void {
  * jeder weitere ist die Küstenkante, die am weitesten von allen bisherigen Häfen entfernt liegt.
  * Kein Hafen teilt eine Ecke mit einem anderen, und in jedem Wasserfeld liegt höchstens einer.
  */
-function setzeHaefenFrei(brett: Brett, typen: HafenTyp[], rng: RngTraeger): void {
-  const plaetze = kuestenKanten(brett).map(({ kante, hex }) => {
+function setzeHaefenFrei(brett: Brett, typen: HafenTyp[], rng: RngTraeger, nurFeld: (hex: number) => boolean = () => true): void {
+  const plaetze = kuestenKanten(brett).filter(({ hex }) => nurFeld(hex)).map(({ kante, hex }) => {
     const k = brett.kanten[kante];
     const h = brett.hexes[hex];
     const mx = (brett.ecken[k.a].x + brett.ecken[k.b].x) / 2;
@@ -336,6 +349,7 @@ function unwucht(brett: Brett): number {
  * Andere Karten als "klassik" werden immer zufällig belegt; `layout` gilt für sie nicht.
  */
 export function erzeugeBrett(gross: boolean, layout: Layout, rng: RngTraeger, karte: KartenId = 'klassik'): Brett {
+  if (istSeeKarte(karte)) return erzeugeSeeBrett(karte, gross, rng);
   if (karte !== 'klassik') {
     const frei = baueGraph(gross, kartenFelder(karte, gross));
     belegeFrei(frei, rng);
@@ -365,4 +379,63 @@ export function erzeugeBrett(gross: boolean, layout: Layout, rng: RngTraeger, ka
   });
   setzeHaefen(brett, gross ? HAEFEN_GROSS : HAEFEN_KLEIN);
   return brett;
+}
+
+// ---------- Seefahrer ----------
+
+/**
+ * Seefahrer-Brett: Land, Gold und Meer aus der Kartenform. Jede Startinsel bekommt genau eine Wüste
+ * und alle fünf Rohstoffe, die Inseln abseits keine Wüste. Goldfelder liegen fest, bekommen aber nie 6 oder 8.
+ * Häfen liegen nur an den Startinseln.
+ */
+export function erzeugeSeeBrett(karte: SeeKarte, gross: boolean, rng: RngTraeger): Brett {
+  const felder = seeFelder(karte, gross);
+  const brett = baueGraph(gross, felder.map((f) => [f.q, f.r]));
+  felder.forEach((f, i) => (brett.hexes[i].gelaende = f.art === 'meer' ? 'meer' : f.art === 'gold' ? 'gold' : 'wald'));
+  const landmassen = inseln(brett);
+  landmassen.forEach((insel, i) => insel.forEach((id) => (brett.hexes[id].insel = i)));
+  const start = landmassen.flatMap((insel, i) => (insel.some((id) => felder[id].art === 'start') ? [i] : []));
+  brett.startInseln = start;
+
+  // Gelände: zuerst je Startinsel eine Wüste, dann den Rest mischen, bis jede Startinsel alles hat.
+  const normal = brett.hexes.filter((h) => h.gelaende !== 'meer' && h.gelaende !== 'gold');
+  const vorrat = gelaendeFuer(normal.length, start.length).filter((g) => g !== 'wueste');
+  for (let versuch = 0; versuch < 300; versuch++) {
+    const wuesten = new Set(start.map((i) => waehleAus(rng, landmassen[i].filter((id) => brett.hexes[id].gelaende !== 'gold'))));
+    const rest = mischen(rng, vorrat);
+    let j = 0;
+    for (const h of normal) h.gelaende = wuesten.has(h.id) ? 'wueste' : rest[j++];
+    const vollstaendig = start.every(
+      (i) => new Set(landmassen[i].map((id) => brett.hexes[id].gelaende).filter((g) => g !== 'wueste' && g !== 'gold')).size === 5,
+    );
+    if (vollstaendig) break;
+  }
+
+  const ertragsfelder = brett.hexes.filter((h) => h.gelaende !== 'meer' && h.gelaende !== 'wueste');
+  const chips = zahlenFuer(ertragsfelder.length);
+  for (;;) {
+    const zahlen = mischen(rng, chips);
+    ertragsfelder.forEach((h, i) => (h.zahl = zahlen[i]));
+    if (rotRegelOk(brett) && ertragsfelder.every((h) => h.gelaende !== 'gold' || (h.zahl !== 6 && h.zahl !== 8))) break;
+  }
+
+  setzeHaefenFrei(brett, mischen(rng, gross ? HAEFEN_GROSS : HAEFEN_KLEIN), rng, (hex) => start.includes(brett.hexes[hex].insel ?? -1));
+  return brett;
+}
+
+function waehleAus(rng: RngTraeger, liste: number[]): number {
+  return liste[Math.floor(zufall(rng) * liste.length)];
+}
+
+/** Startfeld des Piraten: das Meerfeld, das am weitesten von den Startinseln entfernt liegt (null ohne Meer). */
+export function piratStart(brett: Brett): number | null {
+  const meer = brett.hexes.filter((h) => !istLand(h));
+  if (meer.length === 0) return null;
+  const start = brett.hexes.filter((h) => h.insel !== undefined && (brett.startInseln ?? []).includes(h.insel));
+  const bezug = start.length ? start : brett.hexes.filter(istLand);
+  const cx = bezug.reduce((a, h) => a + h.x, 0) / bezug.length;
+  const cy = bezug.reduce((a, h) => a + h.y, 0) / bezug.length;
+  let best = meer[0];
+  for (const h of meer) if (Math.hypot(h.x - cx, h.y - cy) > Math.hypot(best.x - cx, best.y - cy) + 1e-9) best = h;
+  return best.id;
 }

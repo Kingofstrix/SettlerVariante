@@ -64,7 +64,18 @@ export function pruefeHostDaten(d: unknown): HostDaten | null {
     ? {
         ...x.spiel,
         config: { ...STANDARD_CONFIG, ...x.spiel.config },
-        spieler: x.spiel.spieler.map((p) => ({ ...p, wunsch: p.wunsch ?? { suche: [], biete: [] } })),
+        spieler: x.spiel.spieler.map((p) => ({
+          ...p,
+          wunsch: p.wunsch ?? { suche: [], biete: [] },
+          schiffeUebrig: p.schiffeUebrig ?? 0,
+          inselBonus: p.inselBonus ?? [],
+        })),
+        schiffe: x.spiel.schiffe ?? {},
+        pirat: x.spiel.pirat ?? null,
+        gold: x.spiel.gold ?? {},
+        nachGold: x.spiel.nachGold ?? 'aktion',
+        schiffBewegt: x.spiel.schiffBewegt ?? false,
+        schiffeNeu: x.spiel.schiffeNeu ?? [],
         bewegungen: x.spiel.bewegungen ?? [],
         bewegungNr: x.spiel.bewegungNr ?? 0,
         statistik: x.spiel.statistik ?? leereStatistik(x.spiel.spieler.length),
@@ -97,8 +108,8 @@ interface Gast {
   latenz: number | null;
   weg: Weg;
   pings: Map<number, number>;
-  /** Spielnummer, für die das Brett schon gesendet wurde. */
-  brettFuer: number;
+  /** Spielnummer und Nebelstand, für die das Brett schon gesendet wurde. */
+  brettFuer: string;
   /** Zeitpunkte der letzten Chatnachrichten (Spam-Bremse). */
   chatZeiten: number[];
 }
@@ -124,6 +135,8 @@ function schritt(s: GameState): [string, TimerArt] {
   if (s.phase === 'setup') return [`s:${s.setup.schritt}:${s.setup.erwartet}`, 'zug'];
   // Nach einem Dreh am Glücksrad beginnt die Abwurfzeit neu (die Animation soll keine Zeit kosten).
   if (s.phase === 'abwerfen') return [`a:${s.zugNr}:${s.gedreht.length}`, 'abwerfen'];
+  // Gold wählen alle gleichzeitig, mit der Zeit fürs Abwerfen.
+  if (s.phase === 'gold') return [`g:${s.zugNr}:${s.setup.schritt}`, 'abwerfen'];
   if (s.phase === 'sonderbau') return [`b:${s.zugNr}:${s.sonderbau!.index}`, 'sonderbau'];
   return [`z:${s.zugNr}`, 'zug'];
 }
@@ -251,7 +264,7 @@ export class Host extends Beobachtbar implements Sitzung {
   // ---------- Verbindungen ----------
 
   private neueVerbindung(conn: Verbindung): void {
-    const g: Gast = { conn, token: null, rolle: null, letzterPong: Date.now(), latenz: null, weg: null, pings: new Map(), brettFuer: -1, chatZeiten: [] };
+    const g: Gast = { conn, token: null, rolle: null, letzterPong: Date.now(), latenz: null, weg: null, pings: new Map(), brettFuer: '', chatZeiten: [] };
     this.gaeste.add(g);
     conn.onDaten = (d) => {
       const n = pruefeClientNachricht(d);
@@ -472,8 +485,10 @@ export class Host extends Beobachtbar implements Sitzung {
       const idx = g.rolle === 'spieler' ? d.spielerTokens.indexOf(g.token!) : -1;
       const voll = sichtFuer(d.spiel, idx < 0 ? null : idx);
       const sicht: SichtOhneBrett = { ...voll, log: voll.log.slice(-LOG_SENDEN) };
-      if (g.brettFuer === d.spielNr) delete sicht.brett;
-      else g.brettFuer = d.spielNr;
+      // Das Brett geht nur einmal je Partie raus – und erneut, wenn sich der Nebel für diesen Gast lichtet.
+      const brettSchluessel = `${d.spielNr}|${voll.nebelSchluessel}`;
+      if (g.brettFuer === brettSchluessel) delete sicht.brett;
+      else g.brettFuer = brettSchluessel;
       this.sende(g, { v: PROTOKOLL_VERSION, t: 'spiel', spielNr: d.spielNr, sicht, sitze, verbunden, timer, pausiert: d.pausiert });
     }
     // Eigene Ansicht
@@ -578,8 +593,9 @@ export class Host extends Beobachtbar implements Sitzung {
     // nicht aus dem Spiel-RNG (gleicher Seed und gleiche Karte ergeben weiter dasselbe Brett).
     const stimmen = d.sitze.map((s) => s.stimme ?? null);
     const los: RngTraeger = { rngState: seed ^ 0x4b617274 };
-    const wahl = waehleKarte(stimmen, () => zufall(los));
-    const zaehlung = zaehleStimmen(stimmen);
+    const variante = d.einstellungen.variante;
+    const wahl = waehleKarte(stimmen, () => zufall(los), variante);
+    const zaehlung = zaehleStimmen(stimmen, variante);
     const kartenHinweis =
       zaehlung.abgegeben === 0
         ? undefined
@@ -592,6 +608,7 @@ export class Host extends Beobachtbar implements Sitzung {
       kartenHinweis,
       config: {
         karte: wahl.karte,
+        nebel: d.einstellungen.nebel,
         layout: d.einstellungen.layout,
         siegpunkte: d.einstellungen.siegpunkte,
         freundlicherRaeuber: d.einstellungen.freundlicherRaeuber,

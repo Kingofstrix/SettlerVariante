@@ -6,6 +6,8 @@ Browser-Mehrspielerspiel für 3–6 Personen nach dem Prinzip „siedeln, handel
 - **Peer-to-Peer über WebRTC** (PeerJS). Der Browser des Hosts rechnet das ganze Spiel, alle anderen treten mit einem Raumcode bei.
 - Standardregeln plus 5–6-Spieler-Erweiterung mit **Sonderbauphase**, Zugtimer, Beameransicht.
 - **Vier Karten** (Klassik, Zwillingsinseln, Spirale, Fjordland), über die in der Lobby **abgestimmt** wird.
+- **Nebel des Krieges** in drei Stufen (Aus, Mittel, Extrem) als Lobby-Einstellung, für Grundspiel und Seefahrer.
+- **Seefahrer-Variante** als eigener Reiter in der Lobby: Meer, **Schiffe**, **Goldfelder**, **Pirat** und **Bonuspunkte für neue Inseln**, mit zwei eigenen Karten (Neue Ufer, Archipel).
 - **Bankübersicht** (Karten je Rohstoff in der Bank und bei den Spielern), **Chat**, gut sichtbare **Handelsangebote**, **Würfel in der Brettmitte** und **Kartenflug-Animationen** zwischen Hand, Bank und Mitspielern.
 - **Rangliste der Feigen Sippe** auf der Startseite und in der Lobby, **Statistik und Titel** am Spielende, **Suche/Biete-Wunschtafel**, Hinweise auf **unmögliche Handel**, hervorgehobene **neue Bauten** und **Ertragsfelder**, Verlauf nach Zügen.
 
@@ -88,12 +90,54 @@ Tipps:
 - **Belegung:** Die neuen Karten werden immer zufällig belegt: Gelände im Verhältnis des Grundspiels (4:4:4:3:3, dazu 1–2 Wüsten),
   6 und 8 nie nebeneinander, 9 bzw. 11 Häfen möglichst weit auseinander an der Küste. Auf den Zwillingsinseln hat jede Insel alle fünf
   Rohstoffe und höchstens eine Wüste. Die Einstellung „Verteilung auf Klassik“ (Anfänger/Zufall) gilt nur für Klassik.
-- **Kein Seeweg:** Es gibt keine Schiffe. Auf den Zwillingsinseln bleibt jeder auf den Inseln, auf denen er gegründet hat.
+- **Kein Seeweg im Grundspiel:** Auf den Grundspiel-Karten gibt es keine Schiffe. Auf den Zwillingsinseln bleibt jeder auf den Inseln, auf denen er gegründet hat. Schiffe gibt es nur im Reiter „Seefahrer“ (nächster Abschnitt).
 - **Material unverändert:** Rohstoffkarten, Entwicklungskarten und Figuren sind dieselben wie auf Klassik. Die neuen Karten haben
   mehr Felder, die Bank wird dort also eher knapp.
 - **Lokal ausprobieren:** Startseite → „Lokal an einem Gerät spielen“ → Karte wählen.
 - **Neue Karte anlegen:** in `src/engine/karten.ts` eine Form aus Textzeilen eintragen (X = Land), Name und Text ergänzen.
   Vorschau, Abstimmung und Brett kommen von selbst. Klein höchstens sieben, groß höchstens acht Zeilen; jede weitere Zeile macht die Felder kleiner.
+
+## Seefahrer-Variante
+
+Über der Kartenwahl in der Lobby stehen zwei Reiter: **Grundspiel** und **⛵ Seefahrer**. Der Host wählt den Reiter, alle sehen
+ihn. Darunter stehen nur die Karten der gewählten Variante; abgestimmt wird wie gewohnt. Stimmen für Karten der anderen Variante
+ruhen, bis der Reiter zurückwechselt. Auch „Lokal an einem Gerät spielen“ und die Regelhilfe (?) haben die beiden Reiter.
+
+| Karte | Form | Felder Land (3–4 / 5–6 Spieler) |
+|---|---|---|
+| Neue Ufer | eine große Startinsel im Westen, drei kleine Inseln mit Gold im Osten und Süden | 32 / 52 |
+| Archipel | zwei (groß: drei) Startinseln, dazwischen Goldinseln | 37 / 52 |
+
+Regeln (alles aus dem Grundspiel gilt weiter):
+
+- **Gründung** nur auf den Startinseln. Als zweites Teil darf statt der Straße ein Schiff gesetzt werden (Umschalter „🛤️ Straße / ⛵ Schiff“ in der Statuszeile).
+- **Schiff** (1 Holz, 1 Wolle; 15 im Vorrat): liegt auf einer Kante am Wasser, schließt an ein eigenes Gebäude oder eigenes Schiff an. Straße und Schiff verbinden sich nur über eine eigene Siedlung. Am Ende einer Schiffslinie darf an der Küste gesiedelt werden.
+- **Schiff versetzen:** einmal pro Zug ein Schiff am offenen Ende einer Linie, nicht im Bauzug, nicht neben dem Piraten. Im Baumenü „Schiff versetzen“, dann Schiff und neuen Platz anklicken.
+- **Neue Inseln:** Die erste eigene Siedlung auf jeder Insel abseits der Startinseln bringt **+2 Siegpunkte** (🏝️ an der Spielerzeile). Empfohlen sind 12 oder 14 Siegpunkte (14 gibt es nur im Seefahrer-Reiter).
+- **Gold:** Goldfelder liefern Rohstoffe nach Wahl (Stadt: zwei). Nach dem Wurf wählen alle Betroffenen gleichzeitig, mit der Abwurfzeit als Timer; bei Zeitablauf wird zufällig gewählt. Auch die zweite Gründungssiedlung an Gold bringt Gold.
+- **Pirat:** Bei einer 7 oder einem Ritter wird entweder der Räuber (Land) oder der Pirat (Meer) versetzt. Der Pirat bestiehlt Spieler mit Schiff an seinem Feld und sperrt dort Bauen und Versetzen von Schiffen.
+- **Handelsroute:** Für die Längste Handelsstraße zählen Straßen und Schiffe zusammen. Straßenbau gibt zwei kostenlose Straßen oder Schiffe.
+- **Belegung:** Jede Startinsel hat genau eine Wüste und alle fünf Rohstoffe, die Inseln abseits keine Wüste. Goldfelder liegen fest und bekommen nie 6 oder 8. Häfen liegen nur an den Startinseln.
+- **Neue Seefahrer-Karte anlegen:** in `src/engine/karten.ts` unter `SEE_FORMEN` (X = Startinsel, I = Insel abseits, G = Gold, . = Meer).
+
+## Nebel des Krieges
+
+Lobby-Einstellung „🌫️ Nebel des Krieges“ (auch bei „Lokal an einem Gerät spielen“), gilt für alle Karten beider Varianten:
+
+| Stufe | Was verdeckt ist |
+|---|---|
+| Aus | nichts |
+| Mittel | Gelände und Zahlen aller Landfelder während der ganzen Gründung; ab dem ersten Wurf ist alles offen |
+| Extrem | jedes Landfeld, bis man selbst eine Siedlung oder Stadt an einer seiner Ecken hat – jeder Spieler hat seine eigene Sicht |
+
+- Meer, Inselformen, Häfen, Räuber und Pirat bleiben sichtbar. Bei Spielende ist alles offen.
+- Der **Beamer** zeigt in „Extrem“ alle Felder, die irgendein Spieler aufgedeckt hat, in „Mittel“ während der Gründung nichts.
+- Verdeckt wird schon beim Host: Verdeckte Felder gehen gar nicht erst über das Netz (kein Nachschauen in den Entwicklertools).
+- Damit der Nebel nicht über Umwege verrät, was darunter liegt: Start-Rohstoffe stehen im Nebel nur als Anzahl im Verlauf
+  (genau sieht es nur der Spieler selbst). In „Extrem“ gilt das auch für den Würfelertrag. Karten fliegen dann verdeckt
+  und nicht von verdeckten Feldern, und beim Räuber steht keine Zahl.
+- Grenze: Die Bankübersicht zeigt weiter je Rohstoff, wie viel in der Bank liegt. Wer genau mitrechnet, kann daraus nach einem
+  Wurf ableiten, welche Rohstoffe insgesamt ausgeschüttet wurden (nicht, an wen und von welchem Feld).
 
 ## Netzwerk: eduroam, TURN und der Hotspot-Plan
 

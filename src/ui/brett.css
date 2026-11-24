@@ -75,6 +75,59 @@
 .g-wueste {
   --k: var(--g-wueste-k);
 }
+.g-gold {
+  --k: var(--g-gold-k);
+}
+.g-nebel {
+  --k: var(--g-nebel-k);
+}
+
+/* ---------- Seefahrer: Meerfelder, Schiffe, Pirat ---------- */
+
+.meerfeld {
+  fill: none;
+  stroke: var(--weiss);
+  stroke-opacity: 0.16;
+  stroke-width: 2;
+  stroke-dasharray: 6 7;
+}
+.schiff-rumpf {
+  fill: currentColor;
+  stroke: var(--umriss);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+}
+.schiff-segel {
+  fill: #fbf7ea;
+  stroke: var(--umriss);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.schiff-wimpel {
+  fill: currentColor;
+}
+.schiff-schatten {
+  fill: #0b2b44;
+  opacity: 0.35;
+}
+.pirat .schiff-rumpf {
+  fill: #23202a;
+  stroke: #000;
+}
+.pirat .schiff-segel {
+  fill: #2f2b37;
+  stroke: #000;
+}
+.pirat-flagge {
+  fill: #f4f1ea;
+}
+.ziel-kante.see .kante-strich {
+  stroke-dasharray: 3 6;
+  stroke-width: 12;
+}
+.ziel-kante.waehlbar .kante-grund {
+  stroke-opacity: 0.85;
+}
 .feld-kante,
 .feld-oben {
   stroke-width: 7;

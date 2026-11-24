@@ -132,7 +132,33 @@ Wo jede Regel umgesetzt und getestet ist. Pfade relativ zu `src/engine/` bzw. `t
 | Rangliste (verteilt, ohne Doppelte, Spielende einmal) | `netz/rangliste.ts`; `netz/host.ts`: `pruefeEnde`; `netz/client.ts` | `host.test.ts` „Spielende wird einmal eingetragen …“ |
 | Alte Spielstände ohne neue Felder laden | `netz/host.ts`: `pruefeHostDaten` | `host.test.ts` „alte Spielstände ohne Statistik …“ |
 
+## Nebel des Krieges
+
+| Regel | Umsetzung | Test |
+|---|---|---|
+| Aus/Mittel/Extrem als Einstellung, für beide Varianten | `typen.ts`: `Nebel`; `netz/sitzung.ts`; `ui/Lobby.tsx`, `ui/Start.tsx` | `host.test.ts` „Nebel des Krieges über das Netz“ |
+| Mittel: ganze Gründung verdeckt, danach offen; Extrem: nur Felder an eigenen Gebäuden; Beamer: Vereinigung; Spielende offen | `sicht.ts`: `sichtbareFelder`, `brettImNebel` | `nebel.test.ts` (9 Tests, u. a. Zufallsspiele) |
+| Verdecktes geht nicht übers Netz; Brett wird neu gesendet, wenn sich der Nebel lichtet | `sicht.ts`: `nebelSchluessel`; `netz/host.ts`: `rundsenden` | „extrem: jeder Gast bekommt nur seine Felder …“ |
+| Kein Verraten über Verlauf und Kartenflug (Start-Rohstoffe, Würfelertrag in Extrem, Räuberzahl) | `engine.ts`: `verteile`, `SIEDLUNG_BAUEN`, `RAEUBER_SETZEN`, `bewege(geheim)`; `sicht.ts` | „mittel: Start-Rohstoffe …“, „extrem: Würfelertrag …“, „extrem: der Räuber-Eintrag …“ |
+
+## Seefahrer-Variante
+
+| Regel | Umsetzung | Test |
+|---|---|---|
+| Reiter Grundspiel/Seefahrer; Abstimmung nur über Karten der gewählten Variante; Variante folgt aus der Karte | `karten.ts`: `KARTEN_VARIANTE`, `kartenFuer`, `zaehleStimmen`, `waehleKarte`; `ui/Kartenwahl.tsx`: `VariantenReiter`; `netz/host.ts`: `starten` | `seefahrer.test.ts` „Abstimmung zählt nur Karten der gewählten Variante“, „Variante folgt aus der Karte …“ |
+| Bretter mit Meer: Startinseln mit je einer Wüste und allen Rohstoffen, abseits keine Wüste, Gold nie 6/8, Häfen nur an Startinseln, Ring Meer um alles Land | `karten.ts`: `SEE_FORMEN`, `seeFelder`; `brett.ts`: `erzeugeSeeBrett`, `piratStart` | „… Startinseln vollständig, Gold nie rot, Häfen nur an Startinseln“ (120 Seeds je Karte und Größe) |
+| Gründung nur auf Startinseln, zweites Teil Straße oder Schiff | `engine.ts`: `gueltigeSetupEcken`, `SCHIFF_BAUEN` | „nur auf Startinseln; als zweites Teil darf es ein Schiff sein“ |
+| Schiff: Holz + Wolle, nur am Wasser, Anschluss an Gebäude/Schiff; Straßen nur an Land, kein Übergang Straße↔Schiff ohne Siedlung | `regeln.ts`: `gueltigeSchiffKanten`, `gueltigeStrassenKanten`, `landKante`, `meerKante` | „bauen kostet Holz und Wolle …“ |
+| Schiff versetzen: offenes Ende, nicht im Bauzug, einmal pro Zug, nicht am Piraten | `regeln.ts`: `beweglicheSchiffe`, `schiffZiele`; `engine.ts`: `SCHIFF_VERSETZEN` | „versetzen: nur das offene Ende …“ |
+| Handelsroute aus Straßen und Schiffen | `regeln.ts`: `strassenLaenge` | „Handelsroute: Straßen und Schiffe zählen zusammen …“ |
+| Pirat: Meerfelder, sperrt Schiffe, bestiehlt Schiffseigner | `regeln.ts`: `gueltigeRaeuberHexes`, `anliegerGegner`; `engine.ts`: `RAEUBER_SETZEN` | „der Pirat sperrt Schiffe …“ |
+| Gold: freie Wahl nach dem Wurf (auch in der Gründung), Zeitablauf wählt zufällig | `engine.ts`: `verteile`, `GOLD_WAEHLEN`, `goldSoll`; `ui/Dialoge.tsx`: `GoldDialog` | „Gold: Wurf auf ein Goldfeld …“, „Gold mit Zeitablauf …“ |
+| +2 Siegpunkte für die erste Siedlung je neuer Insel | `engine.ts`: `SIEDLUNG_BAUEN`; `regeln.ts`: `oeffentlichePunkte` | „erste Siedlung auf einer neuen Insel …“ |
+| Straßenbau-Karte auch für Schiffe | `engine.ts`: `STRASSENBAU_SPIELEN`, `pruefeFreieStrassen` | „Straßenbau-Karte erlaubt auch kostenlose Schiffe“ |
+| Zufallsspiele mit Invarianten (Schiffe nur am Wasser, Straßen an Land, Figurenbilanz) | `pruefung.ts` | „je 60 Zufallsspiele pro Karte …“ |
+
 ## Nur von Hand geprüft (kein automatischer Test)
 
 - Oberfläche: Platzieren mit Vorschau, Handelsdialog, Abwurfdialog, Beameransicht, Tooltips, Töne, Würfelbühne, Kartenflug, Bankübersicht, Chat.
+- Seefahrer-Oberfläche (Headless-Chrome, lokales Spiel): Reiter, Gründung mit Schiff, Schiff bauen und versetzen, Gold-Dialog, Pirat-Ziele.
 - WebRTC über PeerJS: im Headless-Chrome gegen einen lokalen PeerJS-Server durchgespielt (Beitritt, Start, doppelter Tab, Host-Reload, Trennung). **Nicht** geprüft: der öffentliche PeerJS-Server und echte Uni-Netze.

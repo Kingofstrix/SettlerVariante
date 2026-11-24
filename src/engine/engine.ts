@@ -1,10 +1,15 @@
 // Deterministischer Reducer: (state, aktion) => state | fehler. Alle Validierung passiert hier.
-import { erzeugeBrett } from './brett';
-import { KARTEN_NAME } from './karten';
+import { erzeugeBrett, istLand, piratStart } from './brett';
+import { KARTEN_NAME, KARTEN_VARIANTE } from './karten';
 import { mischen, waehle, zufall, zufallInt } from './rng';
 import {
   anliegerGegner,
+  beweglicheSchiffe,
+  eckeAnLand,
   gueltigeRaeuberHexes,
+  gueltigeSchiffKanten,
+  kanteBelegt,
+  schiffZiele,
   gueltigeSiedlungsEcken,
   gueltigeStadtEcken,
   gueltigeStrassenKanten,
@@ -17,13 +22,16 @@ import {
   ENTW_NAME,
   GELAENDE_ROHSTOFF,
   GLUECKSRAD_CHANCE,
+  INSEL_BONUS,
   KOSTEN,
+  SCHIFFE_JE_SPIELER,
   ROHSTOFFE,
   ROHSTOFF_NAME,
   STANDARD_CONFIG,
   leereRohstoffe,
   summe,
   type Aktion,
+  type Bewegung,
   type EntwTyp,
   type Ergebnis,
   type GameState,
@@ -66,6 +74,8 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
   const n = opt.spieler.length;
   if (n < 3 || n > 6) throw new Error('Es werden 3 bis 6 Spieler benötigt.');
   const config: SpielConfig = { ...STANDARD_CONFIG, ...opt.config };
+  // Die Variante folgt aus der Karte: Seefahrer-Karten haben Meer, Schiffe und Pirat.
+  config.variante = KARTEN_VARIANTE[config.karte];
   const rng = { rngState: opt.seed | 0 };
   const reihenfolge = opt.ohneMischen ? opt.spieler : mischen(rng, opt.spieler);
   const brett = erzeugeBrett(n >= 5, config.layout, rng, config.karte);
@@ -79,7 +89,13 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
     brett,
     gebaeude: {},
     strassen: {},
+    schiffe: {},
     raeuber: brett.hexes.find((h) => h.gelaende === 'wueste')!.id,
+    pirat: piratStart(brett),
+    gold: {},
+    nachGold: 'aktion',
+    schiffBewegt: false,
+    schiffeNeu: [],
     bank: { holz: proRohstoff, lehm: proRohstoff, wolle: proRohstoff, getreide: proRohstoff, erz: proRohstoff },
     stapel,
     gespielteEntw: 0,
@@ -93,6 +109,8 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
       siedlungenUebrig: 5,
       staedteUebrig: 4,
       strassenUebrig: 15,
+      schiffeUebrig: config.variante === 'seefahrer' ? SCHIFFE_JE_SPIELER : 0,
+      inselBonus: [],
       wunsch: { suche: [], biete: [] },
     })),
     aktiv: 0,
@@ -123,7 +141,9 @@ export function neuesSpiel(opt: NeuesSpielOptionen): GameState {
   };
   log(s, `Spiel gestartet (Seed ${s.seed}). Reihenfolge: ${s.spieler.map((p) => p.name).join(', ')}.`);
   if (config.karte !== 'klassik' || opt.kartenHinweis)
-    log(s, `Karte: ${KARTEN_NAME[config.karte]}${opt.kartenHinweis ? ` (${opt.kartenHinweis})` : ''}.`);
+    log(s, `${config.variante === 'seefahrer' ? '⛵ Seefahrer – ' : ''}Karte: ${KARTEN_NAME[config.karte]}${opt.kartenHinweis ? ` (${opt.kartenHinweis})` : ''}.`);
+  if (config.nebel === 'mittel') log(s, '🌫️ Nebel (mittel): Gelände und Zahlen bleiben bis zum Ende der Gründung verdeckt.');
+  if (config.nebel === 'extrem') log(s, '🌫️ Nebel (extrem): Jeder sieht ein Feld erst, wenn er selbst eine Siedlung daran hat.');
   log(s, `Gründungsphase: ${s.spieler[0].name} setzt die erste Siedlung.`);
   return s;
 }
@@ -151,9 +171,12 @@ function klon(s: GameState): GameState {
     ...s,
     gebaeude: { ...s.gebaeude },
     strassen: { ...s.strassen },
+    schiffe: { ...s.schiffe },
+    gold: { ...s.gold },
+    schiffeNeu: s.schiffeNeu.slice(),
     bank: { ...s.bank },
     stapel: s.stapel.slice(),
-    spieler: s.spieler.map((p) => ({ ...p, hand: { ...p.hand }, entw: p.entw.slice() })),
+    spieler: s.spieler.map((p) => ({ ...p, hand: { ...p.hand }, entw: p.entw.slice(), inselBonus: p.inselBonus.slice() })),
     setup: { ...s.setup },
     abwerfen: { ...s.abwerfen },
     stehlenKandidaten: s.stehlenKandidaten.slice(),
@@ -182,7 +205,7 @@ export function setupSpieler(s: Pick<GameState, 'spieler' | 'setup'>): number {
 
 /** Alle Spieler, die gerade etwas tun müssen bzw. dürfen. */
 export function amZug(
-  s: Pick<GameState, 'phase' | 'spieler' | 'setup' | 'abwerfen' | 'sonderbau' | 'aktiv'>,
+  s: Pick<GameState, 'phase' | 'spieler' | 'setup' | 'abwerfen' | 'sonderbau' | 'aktiv'> & { gold?: Record<number, number> },
 ): number[] {
   switch (s.phase) {
     case 'ende':
@@ -191,6 +214,8 @@ export function amZug(
       return [setupSpieler(s)];
     case 'abwerfen':
       return Object.keys(s.abwerfen).map(Number);
+    case 'gold':
+      return Object.keys(s.gold ?? {}).map(Number);
     case 'sonderbau':
       return s.sonderbau ? [s.sonderbau.reihenfolge[s.sonderbau.index]] : [];
     default:
@@ -224,10 +249,13 @@ export function titel(st: Statistik): string[][] {
 const BEWEGUNGEN_MAX = 40;
 
 /** Hält eine Kartenbewegung fest (nur für die Anzeige; ändert keine Karten). */
-function bewege(s: GameState, von: number | null, nach: number | null, r: Rohstoff | 'entw', n: number, hex?: number): void {
+function bewege(s: GameState, von: number | null, nach: number | null, r: Rohstoff | 'entw', n: number, hex?: number, geheim = false): void {
   if (n <= 0) return;
   s.bewegungNr++;
-  s.bewegungen.push(hex === undefined ? { nr: s.bewegungNr, von, nach, r, n } : { nr: s.bewegungNr, von, nach, r, n, hex });
+  const b: Bewegung = { nr: s.bewegungNr, von, nach, r, n };
+  if (hex !== undefined) b.hex = hex;
+  if (geheim) b.geheim = true;
+  s.bewegungen.push(b);
   if (s.bewegungen.length > BEWEGUNGEN_MAX) s.bewegungen.splice(0, s.bewegungen.length - BEWEGUNGEN_MAX);
 }
 
@@ -283,11 +311,21 @@ function aktualisiereMacht(s: GameState, spieler: number): void {
   }
 }
 
-function verteile(s: GameState, zahl: number): string {
+/** Würfelertrag. Im extremen Nebel nennt der öffentliche Text nur die Kartenzahl; was es genau war, sieht nur der Empfänger. */
+function verteile(s: GameState, zahl: number): { text: string; geheim: { spieler: number; text: string }[] } {
+  const verdeckt = s.config.nebel === 'extrem';
   const ertrag = s.spieler.map(() => leereRohstoffe());
   const quellen: { hex: number; spieler: number; r: Rohstoff; n: number }[] = [];
   for (const h of s.brett.hexes) {
     if (h.zahl !== zahl || h.id === s.raeuber) continue;
+    if (h.gelaende === 'gold') {
+      // Gold: Rohstoffe nach Wahl, gewählt wird gleich danach in der Phase „gold“.
+      for (const e of h.ecken) {
+        const g = s.gebaeude[e];
+        if (g) s.gold[g.spieler] = (s.gold[g.spieler] ?? 0) + (g.typ === 'stadt' ? 2 : 1);
+      }
+      continue;
+    }
     const r = GELAENDE_ROHSTOFF[h.gelaende];
     if (!r) continue;
     for (const e of h.ecken) {
@@ -313,9 +351,10 @@ function verteile(s: GameState, zahl: number): string {
   for (const q of quellen) {
     const n = Math.min(q.n, rest[q.spieler][q.r]);
     rest[q.spieler][q.r] -= n;
-    bewege(s, null, q.spieler, q.r, n, q.hex);
+    bewege(s, null, q.spieler, q.r, n, q.hex, verdeckt);
   }
   const teile: string[] = [];
+  const geheim: { spieler: number; text: string }[] = [];
   ertrag.forEach((e, i) => {
     if (summe(e) === 0) return;
     for (const r of ROHSTOFFE) {
@@ -323,11 +362,15 @@ function verteile(s: GameState, zahl: number): string {
       s.bank[r] -= e[r];
     }
     s.statistik.ertrag[i] += summe(e);
-    teile.push(`${s.spieler[i].name} erhält ${formatRohstoffe(e)}`);
+    const n = summe(e);
+    teile.push(verdeckt ? `${s.spieler[i].name} erhält ${n} Karte${n === 1 ? '' : 'n'}` : `${s.spieler[i].name} erhält ${formatRohstoffe(e)}`);
+    if (verdeckt) geheim.push({ spieler: i, text: `Dein Ertrag: ${formatRohstoffe(e)}.` });
   });
+  const goldText = Object.entries(s.gold).map(([i, n]) => `${s.spieler[Number(i)].name} darf ${n}× Gold wählen`);
+  teile.push(...goldText);
   let text = teile.length ? teile.join('; ') : 'niemand erhält etwas';
   if (knapp.length) text += ` (Bank knapp: ${knapp.join(', ')})`;
-  return text;
+  return { text, geheim };
 }
 
 function stehle(s: GameState, dieb: number, opfer: number): void {
@@ -352,6 +395,7 @@ function stehle(s: GameState, dieb: number, opfer: number): void {
 export function kannEtwasBauen(s: GameState, spieler: number): boolean {
   const hand = s.spieler[spieler].hand;
   if (kannZahlen(hand, KOSTEN.strasse) && gueltigeStrassenKanten(s, spieler).length > 0) return true;
+  if (kannZahlen(hand, KOSTEN.schiff) && gueltigeSchiffKanten(s, spieler).length > 0) return true;
   if (kannZahlen(hand, KOSTEN.siedlung) && gueltigeSiedlungsEcken(s, spieler, false).length > 0) return true;
   if (kannZahlen(hand, KOSTEN.stadt) && gueltigeStadtEcken(s, spieler).length > 0) return true;
   if (kannZahlen(hand, KOSTEN.entwicklung) && s.stapel.length > 0) return true;
@@ -372,6 +416,8 @@ function naechsterZug(s: GameState): void {
   s.freieStrassen = 0;
   s.sonderbau = null;
   s.angebote = [];
+  s.schiffBewegt = false;
+  s.schiffeNeu = [];
   log(s, `${s.spieler[s.aktiv].name} ist am Zug.`);
 }
 
@@ -386,16 +432,55 @@ function sonderbauWeiter(s: GameState): void {
   if (sb.index >= sb.reihenfolge.length) naechsterZug(s);
 }
 
-/** Gültige Ecken in der Gründungsphase: frei, Abstandsregel, und mindestens eine freie Kante für die Straße. */
-export function gueltigeSetupEcken(s: Pick<GameState, 'brett' | 'gebaeude' | 'strassen'>): number[] {
+/** Gültige Ecken in der Gründungsphase: frei, Abstandsregel, an Land, und mindestens eine freie Kante für Straße oder Schiff.
+ *  Seefahrer: nur auf den Startinseln. */
+export function gueltigeSetupEcken(s: Pick<GameState, 'brett' | 'gebaeude' | 'strassen'> & { schiffe?: Record<number, number> }): number[] {
+  const start = s.brett.startInseln;
+  const basis = { strassen: s.strassen, schiffe: s.schiffe } as Parameters<typeof kanteBelegt>[0];
   return s.brett.ecken
     .filter(
       (e) =>
         !s.gebaeude[e.id] &&
         e.nachbarn.every((n) => !s.gebaeude[n]) &&
-        e.kanten.some((k) => s.strassen[k] === undefined),
+        eckeAnLand(s.brett, e.id) &&
+        (!start || e.hexes.some((h) => start.includes(s.brett.hexes[h].insel ?? -1))) &&
+        e.kanten.some((k) => !kanteBelegt(basis, k)),
     )
     .map((e) => e.id);
+}
+
+/** Insel einer Ecke (Seefahrer); null ohne Inseln. */
+function inselVon(s: GameState, ecke: number): number | null {
+  for (const h of s.brett.ecken[ecke].hexes) {
+    const hex = s.brett.hexes[h];
+    if (istLand(hex) && hex.insel !== undefined) return hex.insel;
+  }
+  return null;
+}
+
+/** Wählt n zufällige Rohstoffe aus der Bank (für Gold beim Zeitablauf). */
+function zufallsWahl(s: GameState, n: number): Rohstoffe {
+  const bank = { ...s.bank };
+  const wahl = leereRohstoffe();
+  for (let i = 0; i < n; i++) {
+    const da = ROHSTOFFE.filter((r) => bank[r] > 0);
+    if (!da.length) break;
+    const r = waehle(s, da);
+    bank[r]--;
+    wahl[r]++;
+  }
+  return wahl;
+}
+
+/** Wie viele Rohstoffe ein Spieler aus Gold tatsächlich wählen muss (die Bank kann knapp sein). */
+export function goldSoll(s: Pick<GameState, 'gold'> & { bank: Rohstoffe }, spieler: number): number {
+  return Math.min(s.gold[spieler] ?? 0, summe(s.bank));
+}
+
+/** Kostenlose Straßen verfallen, sobald weder Straße noch Schiff mehr gebaut werden kann. */
+function pruefeFreieStrassen(s: GameState, spieler: number): void {
+  if (s.freieStrassen > 0 && gueltigeStrassenKanten(s, spieler).length === 0 && gueltigeSchiffKanten(s, spieler).length === 0)
+    s.freieStrassen = 0;
 }
 
 function setupWeiter(s: GameState): void {
@@ -433,7 +518,7 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
     (s.phase === 'aktion' && istAktiv) ||
     (s.phase === 'sonderbau' && s.sonderbau!.reihenfolge[s.sonderbau!.index] === a.spieler);
   // Solange kostenlose Straßen (Straßenbau-Karte) offen sind, ist nur Straße bauen oder Zug beenden erlaubt.
-  if (s.freieStrassen > 0 && istAktiv && !['STRASSE_BAUEN', 'ZUG_BEENDEN', 'ZEIT_ABGELAUFEN'].includes(a.typ))
+  if (s.freieStrassen > 0 && istAktiv && !['STRASSE_BAUEN', 'SCHIFF_BAUEN', 'ZUG_BEENDEN', 'ZEIT_ABGELAUFEN'].includes(a.typ))
     return 'Baue zuerst deine kostenlosen Straßen.';
 
   switch (a.typ) {
@@ -456,8 +541,14 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
         s.nachRaeuber = 'aktion';
         s.phase = namen.length ? 'abwerfen' : 'raeuber';
       } else {
-        log(s, `${p.name} würfelt ${zahl} – ${verteile(s, zahl)}.`, { wer: a.spieler });
+        const ertrag = verteile(s, zahl);
+        log(s, `${p.name} würfelt ${zahl} – ${ertrag.text}.`, { wer: a.spieler });
+        for (const g of ertrag.geheim) log(s, `${s.spieler[g.spieler].name} hat seinen Ertrag erhalten.`, { wer: g.spieler, geheim: { fuer: [g.spieler], text: g.text } });
         s.phase = 'aktion';
+        if (Object.keys(s.gold).length) {
+          s.nachGold = 'aktion';
+          s.phase = 'gold';
+        }
       }
       return null;
     }
@@ -506,9 +597,16 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
     case 'RAEUBER_SETZEN': {
       if (s.phase !== 'raeuber' || !istAktiv) return UNGUELTIG;
       if (!gueltigeRaeuberHexes(s, a.spieler).includes(a.hex)) return 'Dorthin darf der Räuber nicht.';
-      s.raeuber = a.hex;
       const h = s.brett.hexes[a.hex];
-      log(s, `${p.name} versetzt den Räuber${h.zahl ? ` auf die ${h.zahl}` : ' in die Wüste'}.`, { wer: a.spieler, ort: { hex: a.hex } });
+      if (istLand(h)) {
+        s.raeuber = a.hex;
+        // Im extremen Nebel verriete die Zahl das verdeckte Feld.
+        const wo = s.config.nebel === 'extrem' ? '' : h.zahl ? ` auf die ${h.zahl}` : ' in die Wüste';
+        log(s, `${p.name} versetzt den Räuber${wo}.`, { wer: a.spieler, ort: { hex: a.hex } });
+      } else {
+        s.pirat = a.hex;
+        log(s, `🏴‍☠️ ${p.name} versetzt den Piraten.`, { wer: a.spieler, ort: { hex: a.hex } });
+      }
       const kandidaten = anliegerGegner(s, a.spieler, a.hex).filter((i) => summe(s.spieler[i].hand) > 0);
       if (kandidaten.length > 1) {
         s.stehlenKandidaten = kandidaten;
@@ -551,8 +649,69 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       s.strassen[a.kante] = a.spieler;
       p.strassenUebrig--;
       log(s, `${p.name} baut eine Straße.`, { wer: a.spieler, ort: { kante: a.kante } });
-      if (s.freieStrassen > 0 && gueltigeStrassenKanten(s, a.spieler).length === 0) s.freieStrassen = 0;
+      pruefeFreieStrassen(s, a.spieler);
       aktualisiereStrasse(s);
+      return null;
+    }
+
+    case 'SCHIFF_BAUEN': {
+      if (s.config.variante !== 'seefahrer') return 'Schiffe gibt es nur in der Seefahrer-Variante.';
+      if (s.phase === 'setup') {
+        if (setupSpieler(s) !== a.spieler || s.setup.erwartet !== 'strasse') return UNGUELTIG;
+        if (!gueltigeSchiffKanten(s, a.spieler, s.setup.letzteEcke).includes(a.kante))
+          return 'Das Schiff muss an deine neue Siedlung grenzen und auf dem Wasser liegen.';
+        s.schiffe[a.kante] = a.spieler;
+        p.schiffeUebrig--;
+        log(s, `${p.name} setzt ein Schiff ein.`, { wer: a.spieler, ort: { kante: a.kante } });
+        setupWeiter(s);
+        return null;
+      }
+      if (!baut) return UNGUELTIG;
+      if (p.schiffeUebrig <= 0) return 'Du hast keine Schiffe mehr.';
+      if (!gueltigeSchiffKanten(s, a.spieler).includes(a.kante)) return 'Hier kannst du kein Schiff bauen.';
+      if (s.freieStrassen > 0) s.freieStrassen--;
+      else {
+        if (!kannZahlen(p.hand, KOSTEN.schiff)) return 'Zu wenig Rohstoffe für ein Schiff.';
+        zahle(s, a.spieler, KOSTEN.schiff);
+      }
+      s.schiffe[a.kante] = a.spieler;
+      p.schiffeUebrig--;
+      s.schiffeNeu.push(a.kante);
+      log(s, `${p.name} baut ein Schiff.`, { wer: a.spieler, ort: { kante: a.kante } });
+      pruefeFreieStrassen(s, a.spieler);
+      aktualisiereStrasse(s);
+      return null;
+    }
+
+    case 'SCHIFF_VERSETZEN': {
+      if (s.phase !== 'aktion' || !istAktiv) return UNGUELTIG;
+      if (s.schiffBewegt) return 'Du hast in diesem Zug schon ein Schiff versetzt.';
+      if (!beweglicheSchiffe(s, a.spieler, s.schiffeNeu).includes(a.von))
+        return 'Dieses Schiff kannst du nicht versetzen (nur das offene Ende einer Linie, nicht neu gebaut, nicht beim Piraten).';
+      if (!schiffZiele(s, a.spieler, a.von).includes(a.nach)) return 'Dorthin kann das Schiff nicht.';
+      delete s.schiffe[a.von];
+      s.schiffe[a.nach] = a.spieler;
+      s.schiffBewegt = true;
+      log(s, `${p.name} versetzt ein Schiff.`, { wer: a.spieler, ort: { kante: a.nach } });
+      aktualisiereStrasse(s);
+      return null;
+    }
+
+    case 'GOLD_WAEHLEN': {
+      if (s.phase !== 'gold' || s.gold[a.spieler] === undefined) return UNGUELTIG;
+      const soll = goldSoll(s, a.spieler);
+      const karten = bereinige(a.rohstoffe);
+      if (!karten || summe(karten) !== soll) return `Wähle genau ${soll} Rohstoffe.`;
+      if (!kannZahlen(s.bank, karten)) return 'So viele hat die Bank nicht mehr.';
+      for (const r of ROHSTOFFE) {
+        s.bank[r] -= karten[r];
+        p.hand[r] += karten[r];
+        bewege(s, null, a.spieler, r, karten[r]);
+      }
+      if (s.nachGold === 'aktion') s.statistik.ertrag[a.spieler] += soll;
+      delete s.gold[a.spieler];
+      log(s, `✨ ${p.name} nimmt aus Gold ${formatRohstoffe(karten)}.`, { wer: a.spieler });
+      if (Object.keys(s.gold).length === 0) s.phase = s.nachGold;
       return null;
     }
 
@@ -563,10 +722,13 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
         s.gebaeude[a.ecke] = { spieler: a.spieler, typ: 'siedlung' };
         p.siedlungenUebrig--;
         let text = `${p.name} gründet eine Siedlung`;
+        let geheimText: string | null = null;
         if (s.setup.schritt >= s.spieler.length) {
           // Startrohstoffe für die zweite Siedlung
           const start = leereRohstoffe();
+          let gold = 0;
           for (const h of s.brett.ecken[a.ecke].hexes) {
+            if (s.brett.hexes[h].gelaende === 'gold') gold++;
             const r = GELAENDE_ROHSTOFF[s.brett.hexes[h].gelaende];
             if (r && s.bank[r] > 0) {
               start[r]++;
@@ -574,11 +736,25 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
               p.hand[r]++;
             }
           }
-          for (const r of ROHSTOFFE) bewege(s, null, a.spieler, r, start[r]);
-          text += ` und erhält ${formatRohstoffe(start)}`;
+          // Im Nebel verriete die Liste das Gelände: öffentlich nur die Anzahl, genau sieht es nur der Spieler selbst.
+          const nebel = s.config.nebel !== 'aus';
+          for (const r of ROHSTOFFE) bewege(s, null, a.spieler, r, start[r], undefined, nebel);
+          geheimText = `${text} und erhält ${formatRohstoffe(start)}`;
+          text += nebel ? ` und erhält ${summe(start)} Rohstoff${summe(start) === 1 ? '' : 'e'}` : ` und erhält ${formatRohstoffe(start)}`;
+          if (gold > 0) {
+            s.gold = { [a.spieler]: gold };
+            s.nachGold = 'setup';
+            text += ` (dazu ${gold}× Gold nach Wahl)`;
+            geheimText += ` (dazu ${gold}× Gold nach Wahl)`;
+          }
         }
-        log(s, text + '.', { wer: a.spieler, ort: { ecke: a.ecke } });
+        log(s, text + '.', {
+          wer: a.spieler,
+          ort: { ecke: a.ecke },
+          ...(geheimText && s.config.nebel !== 'aus' ? { geheim: { fuer: [a.spieler], text: geheimText + '.' } } : {}),
+        });
         s.setup = { ...s.setup, erwartet: 'strasse', letzteEcke: a.ecke };
+        if (Object.keys(s.gold).length) s.phase = 'gold';
         return null;
       }
       if (!baut) return UNGUELTIG;
@@ -589,6 +765,12 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       s.gebaeude[a.ecke] = { spieler: a.spieler, typ: 'siedlung' };
       p.siedlungenUebrig--;
       log(s, `${p.name} baut eine Siedlung.`, { wer: a.spieler, ort: { ecke: a.ecke } });
+      // Seefahrer: Die erste eigene Siedlung auf einer Insel abseits der Startinseln bringt Bonuspunkte.
+      const insel = inselVon(s, a.ecke);
+      if (s.brett.startInseln && insel !== null && !s.brett.startInseln.includes(insel) && !p.inselBonus.includes(insel)) {
+        p.inselBonus.push(insel);
+        log(s, `🏝️ ${p.name} besiedelt eine neue Insel: +${INSEL_BONUS} Siegpunkte.`, { wer: a.spieler, ort: { ecke: a.ecke } });
+      }
       aktualisiereStrasse(s); // eine Siedlung kann fremde Straßen unterbrechen
       return null;
     }
@@ -638,9 +820,10 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
           : 'Diese Karte hast du nicht.';
 
       if (a.typ === 'STRASSENBAU_SPIELEN') {
-        if (p.strassenUebrig <= 0 || gueltigeStrassenKanten(s, a.spieler).length === 0)
+        // Seefahrer: Die zwei kostenlosen Bauten dürfen auch Schiffe sein.
+        if (gueltigeStrassenKanten(s, a.spieler).length === 0 && gueltigeSchiffKanten(s, a.spieler).length === 0)
           return 'Du kannst gerade keine Straße bauen.';
-        s.freieStrassen = Math.min(2, p.strassenUebrig);
+        s.freieStrassen = Math.min(2, p.strassenUebrig + p.schiffeUebrig);
         log(s, `${p.name} spielt Straßenbau.`, { wer: a.spieler });
       } else if (a.typ === 'ERFINDUNG_SPIELEN') {
         const r = a.rohstoffe;
@@ -796,13 +979,19 @@ function ausfuehren(s: GameState, a: Aktion): string | null {
       switch (s.phase) {
         case 'setup': {
           const sp = setupSpieler(s);
-          return s.setup.erwartet === 'siedlung'
-            ? ausfuehren(s, { typ: 'SIEDLUNG_BAUEN', spieler: sp, ecke: waehle(s, gueltigeSetupEcken(s)) })
-            : ausfuehren(s, {
-                typ: 'STRASSE_BAUEN',
-                spieler: sp,
-                kante: waehle(s, gueltigeStrassenKanten(s, sp, s.setup.letzteEcke)),
-              });
+          if (s.setup.erwartet === 'siedlung')
+            return ausfuehren(s, { typ: 'SIEDLUNG_BAUEN', spieler: sp, ecke: waehle(s, gueltigeSetupEcken(s)) });
+          const strassen = gueltigeStrassenKanten(s, sp, s.setup.letzteEcke);
+          return strassen.length
+            ? ausfuehren(s, { typ: 'STRASSE_BAUEN', spieler: sp, kante: waehle(s, strassen) })
+            : ausfuehren(s, { typ: 'SCHIFF_BAUEN', spieler: sp, kante: waehle(s, gueltigeSchiffKanten(s, sp, s.setup.letzteEcke)) });
+        }
+        case 'gold': {
+          for (const id of Object.keys(s.gold).map(Number)) {
+            const f = ausfuehren(s, { typ: 'GOLD_WAEHLEN', spieler: id, rohstoffe: zufallsWahl(s, goldSoll(s, id)) });
+            if (f) return f;
+          }
+          return null;
         }
         case 'wuerfeln':
           return ausfuehren(s, { typ: 'WUERFELN', spieler: s.aktiv });

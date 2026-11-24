@@ -3,7 +3,8 @@
 import type { JSX } from 'preact';
 import type { Gelaende } from '../engine';
 
-export const GELAENDE_ARTEN: Gelaende[] = ['wald', 'huegel', 'weide', 'acker', 'gebirge', 'wueste'];
+/** Gezeichnete Landarten (Meer hat kein eigenes Feldbild). */
+export const GELAENDE_ARTEN: Gelaende[] = ['wald', 'huegel', 'weide', 'acker', 'gebirge', 'wueste', 'gold', 'nebel'];
 
 function baum(x: number, y: number, s: number): JSX.Element {
   return (
@@ -83,6 +84,35 @@ function bild(g: Gelaende): JSX.Element {
           <path d="M-54,-14-20,-70-9,-14ZM3,-36 19,-55 15,-14H-2Z" fill="#7d849b" />
           <path d="M-20,-70l10,14.5-8,5-6-7-7,6ZM19,-55l9,11-6,3-5-4.5-5,3.5Z" fill="#f8fafd" />
           <path d="M-54,-14-20,-70 3,-36 19,-55 52,-14Z" fill="none" stroke="#3b4050" stroke-width="2.6" stroke-linejoin="round" />
+        </>
+      );
+    case 'gold':
+      // Goldfeld (Seefahrer): dunkler Fels mit glänzenden Nuggets – deutlich anders als das gelbe Acker-Feld
+      return (
+        <>
+          <path d="M-46,-12-24,-50-8,-30 8,-58 44,-12Z" fill="#6b5330" stroke="#3e2d14" stroke-width="2.4" stroke-linejoin="round" />
+          <g fill="#ffd84a" stroke="#8a5f00" stroke-width="2.2" stroke-linejoin="round">
+            <path d="M-30,-20l7,-9 10,2 3,8-8,6-10,-1Z" />
+            <path d="M-2,-30l9,-8 11,3 1,10-10,5-10,-3Z" />
+            <path d="M16,-17l6,-6 8,2 1,6-7,4-7,-1Z" />
+          </g>
+          <path d="M-20,-27l4,-2M3,-35l5,-2M20,-20l3,-1" stroke="#fff8d0" stroke-width="2.2" stroke-linecap="round" />
+          <path d="M30,-58v12M24,-52h12M-36,-48v8M-40,-44h8" stroke="#fff3a0" stroke-width="2.4" stroke-linecap="round" />
+        </>
+      );
+    case 'meer':
+      return <></>;
+    case 'nebel':
+      // Verdecktes Feld (Nebel des Krieges): Wolken und ein Fragezeichen statt Gelände und Zahl
+      return (
+        <>
+          <g fill="#f4f6fa" stroke="#9aa4b6" stroke-width="2.2">
+            <path d="M-50,-8a14,14 0 0 1 8,-25a19,19 0 0 1 33,-10a16,16 0 0 1 28,6a13,13 0 0 1 6,29Z" />
+            <path d="M-6,40a12,12 0 0 1 6,-21a16,16 0 0 1 28,-6a13,13 0 0 1 22,9a11,11 0 0 1 1,18Z" opacity="0.85" />
+          </g>
+          <text y="22" text-anchor="middle" font-size="46" font-weight="800" fill="#5d6779" opacity="0.75">
+            ?
+          </text>
         </>
       );
     case 'wueste':

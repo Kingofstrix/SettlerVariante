@@ -2,8 +2,10 @@
 import type { ComponentChildren, JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import {
+  INSEL_BONUS,
   ROHSTOFFE,
   ROHSTOFF_NAME,
+  goldSoll,
   kartenProRohstoff,
   leereRohstoffe,
   summe,
@@ -12,6 +14,7 @@ import {
   type Rohstoff,
   type Rohstoffe,
   type Sicht,
+  type Variante,
 } from '../engine';
 import { farbHex, type Absicht } from '../netz/sitzung';
 import { RohstoffIcon } from './Icons';
@@ -279,6 +282,41 @@ export function AbwerfenDialog({
   );
 }
 
+// ---------- Gold (Seefahrer) ----------
+
+export function GoldDialog({ sicht, aktion, rest }: { sicht: Sicht; aktion: (a: Absicht) => void; rest: number | null }): JSX.Element {
+  const ich = sicht.ich!;
+  const soll = goldSoll(sicht, ich);
+  const [karten, setKarten] = useState<Rohstoffe>(leereRohstoffe());
+  const n = summe(karten);
+  return (
+    <Modal titel={`✨ Gold! Wähle ${soll} Rohstoff${soll === 1 ? '' : 'e'}`} breit>
+      <p class="hinweis">
+        Ein Goldfeld hat geliefert: Du nimmst dir {soll === 1 ? 'einen Rohstoff' : `${soll} Rohstoffe`} deiner Wahl aus der Bank.
+        {rest !== null && <b> Noch {rest} s – danach wird zufällig gewählt.</b>}
+      </p>
+      <div class="abwurf">
+        {ROHSTOFFE.map((r) => (
+          <div class={`abwurf-karte ${sicht.bank[r] === 0 ? 'leer' : ''}`}>
+            <RohstoffIcon typ={r} groesse={34} />
+            <div>{ROHSTOFF_NAME[r]}</div>
+            <small>Bank: {sicht.bank[r]}</small>
+            <Zaehler wert={karten[r]} max={Math.min(sicht.bank[r], karten[r] + soll - n)} onChange={(x) => setKarten({ ...karten, [r]: x })} />
+          </div>
+        ))}
+      </div>
+      <footer>
+        <span>
+          {n} / {soll} gewählt
+        </span>
+        <button class="knopf haupt" disabled={n !== soll} onClick={() => aktion({ typ: 'GOLD_WAEHLEN', rohstoffe: karten })}>
+          Nehmen
+        </button>
+      </footer>
+    </Modal>
+  );
+}
+
 // ---------- Stehlen ----------
 
 export function StehlenDialog({ sicht, aktion }: { sicht: Sicht; aktion: (a: Absicht) => void }): JSX.Element {
@@ -396,9 +434,72 @@ export function WunschDialog({ sicht, aktion, onZu }: { sicht: Sicht; aktion: (a
 
 // ---------- Regelhilfe ----------
 
-export function HilfeDialog({ onZu }: { onZu: () => void }): JSX.Element {
+export function HilfeDialog({ onZu, variante = 'grund' }: { onZu: () => void; variante?: Variante }): JSX.Element {
+  const [reiter, setReiter] = useState<Variante>(variante);
   return (
     <Modal titel="Regeln in Kürze" onZu={onZu} breit>
+      <div class="reiter hilfe-reiter" role="tablist">
+        <button role="tab" aria-selected={reiter === 'grund'} class={`reiter-knopf ${reiter === 'grund' ? 'an' : ''}`} onClick={() => setReiter('grund')}>
+          Grundspiel
+        </button>
+        <button role="tab" aria-selected={reiter === 'seefahrer'} class={`reiter-knopf ${reiter === 'seefahrer' ? 'an' : ''}`} onClick={() => setReiter('seefahrer')}>
+          ⛵ Seefahrer
+        </button>
+      </div>
+      {reiter === 'seefahrer' ? <SeefahrerHilfe /> : <GrundHilfe />}
+    </Modal>
+  );
+}
+
+function SeefahrerHilfe(): JSX.Element {
+  return (
+    <div class="hilfe">
+      <section>
+        <h3>Worum es geht</h3>
+        <p>
+          Alle Regeln des Grundspiels gelten. Dazu kommt das Meer: Mit Schiffen erreichst du Inseln abseits der Startinseln. Gegründet
+          wird nur auf den Startinseln.
+        </p>
+        <h3>Schiffe</h3>
+        <p>
+          Ein Schiff kostet <RohstoffListe r={{ holz: 1, wolle: 1 }} /> und liegt auf einer Kante am Wasser (Küste oder offenes Meer).
+          Es schließt an eine eigene Siedlung/Stadt oder an ein eigenes Schiff an. Von einer Straße auf ein Schiff (und zurück) geht es
+          nur über eine eigene Siedlung. Am Ende einer Schiffslinie darfst du eine Siedlung an der Küste bauen. Vorrat: 15 Schiffe.
+        </p>
+        <h3>Schiff versetzen</h3>
+        <p>
+          Einmal pro Zug darfst du ein Schiff am offenen Ende einer Linie an eine andere passende Stelle setzen. Nicht im selben Zug, in
+          dem es gebaut wurde, und nicht, wenn der Pirat daneben liegt.
+        </p>
+        <h3>Neue Inseln</h3>
+        <p>
+          Deine erste Siedlung auf jeder Insel abseits der Startinseln bringt <b>{INSEL_BONUS} Siegpunkte</b> extra. Für Seefahrer-Partien
+          empfehlen sich 12 oder 14 Siegpunkte.
+        </p>
+      </section>
+      <section>
+        <h3>Gold</h3>
+        <p>
+          Goldfelder liefern einen Rohstoff deiner Wahl (Stadt: zwei). Nach dem Wurf wählen alle mit Gold gleichzeitig aus der Bank.
+          Auch die zweite Gründungssiedlung an einem Goldfeld bringt Gold.
+        </p>
+        <h3>Der Pirat</h3>
+        <p>
+          Bei einer 7 oder einem Ritter versetzt du entweder den Räuber (auf ein Landfeld) oder den Piraten (auf ein Meerfeld). Der
+          Pirat bestiehlt einen Spieler mit Schiff an seinem Feld. Dort kann niemand Schiffe bauen oder versetzen.
+        </p>
+        <h3>Handelsroute und Karten</h3>
+        <p>
+          Für die Längste Handelsstraße zählen Straßen und Schiffe zusammen. Die Karte Straßenbau gibt zwei kostenlose Straßen oder
+          Schiffe in beliebiger Mischung.
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function GrundHilfe(): JSX.Element {
+  return (
       <div class="hilfe">
         <section>
           <h3>Ziel</h3>
@@ -476,6 +577,13 @@ export function HilfeDialog({ onZu }: { onZu: () => void }): JSX.Element {
             Längste Handelsstraße ab 5 zusammenhängenden Straßen, Größte Rittermacht ab 3 Rittern. Wer gleichzieht, bekommt die Karte
             nicht – man muss überbieten.
           </p>
+          <h3>🌫️ Nebel des Krieges (Lobby)</h3>
+          <p>
+            <b>Mittel:</b> Gelände und Zahlen sind während der ganzen Gründung verdeckt, ab dem ersten Wurf ist alles offen.{' '}
+            <b>Extrem:</b> Du siehst ein Feld erst, wenn du selbst eine Siedlung oder Stadt an einer seiner Ecken hast; die anderen
+            sehen ihre eigenen Felder. Der Beamer zeigt, was irgendwer aufgedeckt hat. Im Verlauf steht dann nur, wie viele Karten
+            jemand bekommt. Bei Spielende ist alles offen.
+          </p>
           <h3>Sonderbauphase (5–6 Spieler)</h3>
           <p>
             Nach jedem Zug dürfen alle anderen reihum bauen und Entwicklungskarten kaufen – aber nicht handeln und keine Karten
@@ -483,6 +591,5 @@ export function HilfeDialog({ onZu }: { onZu: () => void }): JSX.Element {
           </p>
         </section>
       </div>
-    </Modal>
   );
 }
